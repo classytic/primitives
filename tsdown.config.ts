@@ -1,0 +1,32 @@
+import { defineConfig } from 'tsdown';
+
+export default defineConfig({
+  entry: [
+    'src/money.ts',
+    'src/currency.ts',
+    'src/address.ts',
+    'src/period.ts',
+    'src/pagination.ts',
+    'src/reference.ts',
+    'src/context.ts',
+    'src/events.ts',
+    'src/outbox.ts',
+    'src/tenant.ts',
+    'src/result.ts',
+    'src/brand.ts',
+    'src/errors.ts',
+    'src/split-allocation.ts',
+    'src/approval.ts',
+    'src/cadence.ts',
+    'src/hold.ts',
+    'src/sla.ts',
+    'src/person.ts',
+  ],
+  format: ['esm'],
+  dts: { sourcemap: false },
+  clean: true,
+  sourcemap: false,
+  treeshake: true,
+  target: 'node22',
+  outDir: 'dist',
+});

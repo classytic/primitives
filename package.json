@@ -1,0 +1,142 @@
+{
+  "name": "@classytic/primitives",
+  "version": "0.1.0",
+  "description": "Framework-agnostic TypeScript primitives shared across Classytic packages — Money, events, pagination, tenant config, and other building blocks.",
+  "author": "Classytic",
+  "license": "MIT",
+  "homepage": "https://www.npmjs.com/package/@classytic/primitives",
+  "bugs": {
+    "url": "https://github.com/classytic/primitives/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/classytic/primitives.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    "./money": {
+      "types": "./dist/money.d.mts",
+      "default": "./dist/money.mjs"
+    },
+    "./currency": {
+      "types": "./dist/currency.d.mts",
+      "default": "./dist/currency.mjs"
+    },
+    "./address": {
+      "types": "./dist/address.d.mts",
+      "default": "./dist/address.mjs"
+    },
+    "./period": {
+      "types": "./dist/period.d.mts",
+      "default": "./dist/period.mjs"
+    },
+    "./pagination": {
+      "types": "./dist/pagination.d.mts",
+      "default": "./dist/pagination.mjs"
+    },
+    "./reference": {
+      "types": "./dist/reference.d.mts",
+      "default": "./dist/reference.mjs"
+    },
+    "./context": {
+      "types": "./dist/context.d.mts",
+      "default": "./dist/context.mjs"
+    },
+    "./events": {
+      "types": "./dist/events.d.mts",
+      "default": "./dist/events.mjs"
+    },
+    "./outbox": {
+      "types": "./dist/outbox.d.mts",
+      "default": "./dist/outbox.mjs"
+    },
+    "./tenant": {
+      "types": "./dist/tenant.d.mts",
+      "default": "./dist/tenant.mjs"
+    },
+    "./result": {
+      "types": "./dist/result.d.mts",
+      "default": "./dist/result.mjs"
+    },
+    "./brand": {
+      "types": "./dist/brand.d.mts",
+      "default": "./dist/brand.mjs"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.mts",
+      "default": "./dist/errors.mjs"
+    },
+    "./split-allocation": {
+      "types": "./dist/split-allocation.d.mts",
+      "default": "./dist/split-allocation.mjs"
+    },
+    "./approval": {
+      "types": "./dist/approval.d.mts",
+      "default": "./dist/approval.mjs"
+    },
+    "./cadence": {
+      "types": "./dist/cadence.d.mts",
+      "default": "./dist/cadence.mjs"
+    },
+    "./hold": {
+      "types": "./dist/hold.d.mts",
+      "default": "./dist/hold.mjs"
+    },
+    "./sla": {
+      "types": "./dist/sla.d.mts",
+      "default": "./dist/sla.mjs"
+    },
+    "./person": {
+      "types": "./dist/person.d.mts",
+      "default": "./dist/person.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src/ tests/",
+    "lint:fix": "biome check --write src/ tests/",
+    "test": "vitest run --project unit --project integration",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:all": "vitest run",
+    "test:watch": "vitest --project unit --project integration",
+    "test:smoke": "node tests/smoke/smoke.mjs",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build && npm run test:smoke",
+    "release": "npm run build && npm run typecheck && npm publish --access public"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.9",
+    "@types/node": "^25.5.0",
+    "tsdown": "^0.21.7",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "keywords": [
+    "typescript",
+    "types",
+    "primitives",
+    "money",
+    "currency",
+    "pagination",
+    "domain-event",
+    "tenant",
+    "classytic",
+    "commerce"
+  ]
+}
