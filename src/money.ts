@@ -2,6 +2,46 @@ import type { CurrencyCode } from './currency.js';
 import { minorUnitFactor } from './currency.js';
 
 /**
+ * Wire-format monetary amount: integer minor units, branded with a phantom
+ * currency type so calls like `formatBdt(usdValue)` fail at compile time.
+ *
+ * Use this for HTTP/JSON fields where transmitting a `Money` struct would be
+ * overkill: `interface Order { grandTotal: MinorUnits<'BDT'>; ... }`. Pair
+ * with the structured {@link Money} for in-process arithmetic.
+ *
+ * Erases at runtime — branded types have zero cost.
+ *
+ * @example
+ * type Paisa = MinorUnits<'BDT'>;
+ * type UsdCents = MinorUnits<'USD'>;
+ * const p: Paisa = MinorUnits(489900, 'BDT');
+ * const c: UsdCents = p; // ❌ type error: BDT vs USD
+ */
+declare const __unitBrand: unique symbol;
+declare const __currencyBrand: unique symbol;
+
+export type MinorUnits<C extends string = string> = number & {
+  readonly [__unitBrand]: 'minor';
+  readonly [__currencyBrand]: C;
+};
+
+/**
+ * Cast a raw number to {@link MinorUnits}. Pass the currency as the second
+ * argument to fix the phantom type. With no second arg, `MinorUnits<string>`
+ * — useful for generic SDK boundaries that don't know the currency yet.
+ *
+ * @example
+ * MinorUnits(489900, 'BDT')   // typed MinorUnits<'BDT'>
+ * MinorUnits(199, 'USD')      // typed MinorUnits<'USD'>
+ */
+export function MinorUnits<C extends string = string>(
+  amount: number,
+  _currency?: C,
+): MinorUnits<C> {
+  return amount as MinorUnits<C>;
+}
+
+/**
  * A monetary amount stored as an integer in the currency's minor unit.
  *
  * Examples:

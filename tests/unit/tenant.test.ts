@@ -22,7 +22,7 @@ describe('resolveTenantConfig', () => {
     expect(cfg.contextKey).toBe('organizationId');
   });
 
-  it('merges partial override onto defaults', () => {
+  it('merges partial override onto defaults (contextKey cascades from tenantField)', () => {
     const cfg = resolveTenantConfig({ tenantField: 'tenantId', fieldType: 'string' });
     expect(cfg).toEqual({
       strategy: 'field',
@@ -30,9 +30,20 @@ describe('resolveTenantConfig', () => {
       tenantField: 'tenantId',
       fieldType: 'string',
       ref: 'organization',
-      contextKey: 'organizationId',
+      // contextKey mirrors tenantField when not explicitly supplied
+      contextKey: 'tenantId',
       required: true,
     });
+  });
+
+  it('contextKey defaults to tenantField when not provided', () => {
+    expect(resolveTenantConfig({ tenantField: 'branchId' }).contextKey).toBe('branchId');
+  });
+
+  it('explicit contextKey overrides the tenantField cascade', () => {
+    const cfg = resolveTenantConfig({ tenantField: 'branchId', contextKey: 'organizationId' });
+    expect(cfg.tenantField).toBe('branchId');
+    expect(cfg.contextKey).toBe('organizationId');
   });
 
   it('allows every field to be overridden', () => {

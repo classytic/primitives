@@ -78,7 +78,14 @@ export interface TenantConfig {
   /**
    * Which key on `OperationContext` to read the tenant id from.
    *
-   * @default 'organizationId'
+   * Defaults cascade: if omitted, falls back to the caller's `tenantField`
+   * (if supplied), else to `'organizationId'`. Rationale: when a host renames
+   * `tenantField` to e.g. `'branchId'`, their `OperationContext` almost always
+   * carries the value under the same key — so mirroring `tenantField` is the
+   * least-surprise behavior. Override explicitly if the context key diverges
+   * from the document field (e.g. `tenantField: 'branchId'`, `contextKey: 'organizationId'`).
+   *
+   * @default tenantField ?? 'organizationId'
    */
   contextKey?: string;
 
@@ -152,6 +159,13 @@ export function resolveTenantConfig(config?: TenantConfig | boolean): ResolvedTe
 
   const strategy: TenantStrategy = config.strategy ?? (config.enabled === false ? 'none' : 'field');
 
+  // `contextKey` cascade: explicit > tenantField > default. When a host renames
+  // `tenantField`, their `OperationContext` carries the id under the same key
+  // in the overwhelming majority of cases; mirroring the rename is the least-
+  // surprise default. Callers who genuinely need a split (doc field ≠ ctx key)
+  // must set `contextKey` explicitly.
+  const contextKey = config.contextKey ?? config.tenantField ?? DEFAULT_TENANT_CONFIG.contextKey;
+
   if (strategy === 'none') {
     // Preserve user-supplied `tenantField`, `fieldType`, `ref`, `contextKey`
     // — even when scoping is disabled, the doc field still needs to be
@@ -160,6 +174,7 @@ export function resolveTenantConfig(config?: TenantConfig | boolean): ResolvedTe
     return {
       ...DEFAULT_TENANT_CONFIG,
       ...config,
+      contextKey,
       strategy: 'none',
       enabled: false,
       required: false,
@@ -173,6 +188,7 @@ export function resolveTenantConfig(config?: TenantConfig | boolean): ResolvedTe
     return {
       ...DEFAULT_TENANT_CONFIG,
       ...config,
+      contextKey,
       strategy: 'custom',
       enabled: config.enabled ?? true,
       resolve: config.resolve,
@@ -182,6 +198,7 @@ export function resolveTenantConfig(config?: TenantConfig | boolean): ResolvedTe
   return {
     ...DEFAULT_TENANT_CONFIG,
     ...config,
+    contextKey,
     strategy: 'field',
     enabled: config.enabled ?? true,
   };

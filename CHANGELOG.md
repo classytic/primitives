@@ -3,6 +3,26 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1]
+
+### Added
+
+- **`MinorUnits<C>` branded type on `/money`** — wire-format monetary amount
+  (integer minor units, branded with phantom currency) for HTTP/JSON fields
+  where a full `Money` struct is overkill. Erases at runtime; `MinorUnits<'BDT'>`
+  vs `MinorUnits<'USD'>` collide at compile time. Pair with structured `Money`
+  for in-process arithmetic. Constructor: `MinorUnits(amount, currency?)`.
+
+### Changed
+
+- **`/tenant` `contextKey` cascade default** — `resolveTenantConfig({ tenantField: 'branchId' })`
+  now defaults `contextKey` to `'branchId'` instead of `'organizationId'`.
+  When a host renames `tenantField`, their `OperationContext` carries the id
+  under the same key in the overwhelming majority of cases; mirroring the
+  rename is the least-surprise default. Explicit `contextKey` still overrides
+  (set when the doc field and context key genuinely diverge). Existing call
+  sites that supplied both `tenantField` and `contextKey` are unaffected.
+
 ## [0.1.0]
 
 Initial release. Framework-agnostic TypeScript primitives shared across
