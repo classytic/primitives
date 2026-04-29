@@ -39,6 +39,8 @@ const checks = [
   ['./result', 'err'],
   ['./brand', null],
   ['./errors', 'ERROR_CODES'],
+  ['./state-machine', 'defineStateMachine'],
+  ['./state-machine', 'IllegalTransitionError'],
 ];
 
 const failures = [];
@@ -77,6 +79,31 @@ assert.equal(evt.type, 'order:placed');
 assert.equal(typeof evt.meta.id, 'string');
 assert.ok(evt.meta.timestamp instanceof Date);
 assert.equal(matchEventPattern('order:*', 'order:placed'), true);
+
+// Functional smoke: state-machine declarative transitions
+const { defineStateMachine, IllegalTransitionError } = await loadDist(
+  pkg.exports['./state-machine'].default,
+);
+const sm = defineStateMachine({
+  name: 'SmokeOrder',
+  transitions: {
+    draft: ['posted', 'cancelled'],
+    posted: [],
+    cancelled: [],
+  },
+});
+assert.equal(sm.canTransition('draft', 'posted'), true);
+assert.equal(sm.canTransition('posted', 'draft'), false);
+assert.equal(sm.isTerminal('posted'), true);
+let smThrew = null;
+try {
+  sm.assertTransition('id-1', 'posted', 'draft');
+} catch (err) {
+  smThrew = err;
+}
+assert.ok(smThrew instanceof IllegalTransitionError, 'state-machine: expected IllegalTransitionError');
+assert.equal(smThrew.code, 'illegal_transition');
+assert.equal(smThrew.entityId, 'id-1');
 
 if (failures.length > 0) {
   console.error('\n smoke FAILED:');

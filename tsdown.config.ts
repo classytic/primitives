@@ -21,6 +21,7 @@ export default defineConfig({
     'src/hold.ts',
     'src/sla.ts',
     'src/person.ts',
+    'src/state-machine.ts',
   ],
   format: ['esm'],
   dts: { sourcemap: false },

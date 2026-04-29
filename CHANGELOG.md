@@ -3,6 +3,43 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0]
+
+### Added
+
+- **`/state-machine` subpath** — `defineStateMachine<TStatus>({ name, transitions, errorFactory? })`
+  declarative state-transition primitive. Replaces hand-rolled
+  `if (status === 'X') throw` blocks across kernels:
+
+  ```typescript
+  import { defineStateMachine } from '@classytic/primitives/state-machine';
+
+  const ORDER_MACHINE = defineStateMachine<OrderStatus>({
+    name: 'Order',
+    transitions: {
+      draft: ['approved', 'cancelled'],
+      approved: ['shipped', 'cancelled'],
+      shipped: [],
+      cancelled: [],
+    },
+  });
+
+  ORDER_MACHINE.assertTransition('order-1', 'draft', 'approved'); // OK
+  ORDER_MACHINE.assertTransition('order-1', 'shipped', 'draft');  // throws
+  ORDER_MACHINE.canTransition('draft', 'shipped');                // false
+  ORDER_MACHINE.isTerminal('shipped');                            // true
+  ```
+
+  Generic over the status string-union — `Record<TStatus, readonly TStatus[]>`
+  on `transitions` enforces exhaustiveness at the call site. Kernels with their
+  own typed transition error class (e.g. flow's `InvalidTransitionError`) wire
+  it via `errorFactory` so the thrown type stays domain-consistent. Standalone
+  callers get the bundled `IllegalTransitionError` (carries `entityType` /
+  `entityId` / `from` / `to` + `code: 'illegal_transition'` + `status: 422`).
+
+  First consumer: `@classytic/flow` `PROCUREMENT_MACHINE` (procurement-order
+  approve / cancel transitions).
+
 ## [0.1.1]
 
 ### Added
