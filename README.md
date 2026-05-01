@@ -4,9 +4,30 @@ Framework-agnostic TypeScript primitives shared across Classytic packages.
 Zero runtime dependencies. ESM only. Node 22+.
 
 These are the building blocks every Classytic package speaks in common:
-`Money`, `DomainEvent`, `TenantConfig`, `OperationContext`, pagination shapes,
-polymorphic references. When a package duplicates one of these shapes, it
-drifts — this package exists so it doesn't.
+`Money`, `DomainEvent`, `OperationContext`, polymorphic references. When a
+package duplicates one of these shapes, it drifts — this package exists so it
+doesn't.
+
+> **Canonical-contract relocations in 0.3.0.** Three modules moved out to
+> `@classytic/repo-core` so kits and arc see one source of truth instead of
+> two:
+> - **Pagination** (`OffsetPaginationResult`, `KeysetPaginationResult`,
+>   `AggregatePaginationResult`, `PaginationResult`, `toCanonicalList()`) →
+>   `@classytic/repo-core/pagination`.
+> - **Tenant config** (`TenantConfig`, `TenantStrategy`, `TenantFieldType`,
+>   `resolveTenantConfig`, `DEFAULT_TENANT_CONFIG`, `ResolvedTenantConfig`) →
+>   `@classytic/repo-core/tenant`. Mongokit and sqlitekit's
+>   `MultiTenantOptions extends Pick<TenantConfig, ...>`.
+> - **Error contracts** (`HttpError` throwable, `ErrorContract` wire shape,
+>   `ErrorDetail`, `ErrorCode`, `ERROR_CODES`, `toErrorContract()`,
+>   `statusToErrorCode()`) → `@classytic/repo-core/errors`.
+>   `ArcError implements HttpError`.
+>
+> Events stay here. `@classytic/primitives/events` remains the canonical
+> source for `EventMeta`, `DomainEvent`, `EventHandler`, `EventLogger`,
+> `EventTransport`, `DeadLetteredEvent`, `PublishManyResult`, `createEvent`,
+> `createChildEvent`, `matchEventPattern`. Arc 2.12 re-exports only the
+> runtime `MemoryEventTransport`.
 
 ## Install
 
@@ -22,10 +43,14 @@ at compile time, runtime helpers are tiny.
 ```ts
 import { addMoney, fromMajor, type Money } from '@classytic/primitives/money';
 import { createEvent, type DomainEvent, type EventTransport } from '@classytic/primitives/events';
-import { resolveTenantConfig, type TenantConfig } from '@classytic/primitives/tenant';
 import type { OperationContext } from '@classytic/primitives/context';
-import type { OffsetPage, PageParams } from '@classytic/primitives/pagination';
 import { allocate, type SplitResult } from '@classytic/primitives/split-allocation';
+// Tenant config, error contracts, and pagination now live in repo-core:
+import { resolveTenantConfig, type TenantConfig } from '@classytic/repo-core/tenant';
+import type { HttpError, ErrorContract } from '@classytic/repo-core/errors';
+import type {
+  OffsetPaginationResult, KeysetPaginationResult, AggregatePaginationResult,
+} from '@classytic/repo-core/pagination';
 ```
 
 There is intentionally **no root barrel** — a barrel forces the Node ESM
@@ -41,14 +66,11 @@ subpath imports only.
 | `/currency` | `CurrencyCode` brand, `CURRENCIES`, `MINOR_UNIT_FACTOR`, `minorUnitFactor`, `toCurrencyCode`, `isCurrencyCode` |
 | `/address` | `Address`, `ContactAddress`, `GeoPoint`, `GeoJsonPoint`, `toGeoJsonPoint`, `fromGeoJsonPoint` |
 | `/period` | `DateRange`, `Period`, `isDateRange`, `isWithin`, `rangeDurationMs` |
-| `/pagination` | `PageParams`, `KeysetParams`, `SortSpec`, `SortDirection`, `OffsetPage<T>`, `KeysetPage<T>`, `AggregatePage<T>`, `emptyOffsetPage`, `emptyKeysetPage` |
 | `/reference` | `ExternalRef`, `ObjectIdLike`, `IdLike`, `DocumentRef`, `idToString`, `isExternalRef` |
 | `/context` | `OperationContext`, `ActorRef` |
-| `/events` | `DomainEvent`, `EventMeta`, `EventHandler`, `EventTransport`, `createEvent`, `matchEventPattern` |
-| `/tenant` | `TenantConfig`, `TenantFieldType`, `DEFAULT_TENANT_CONFIG`, `resolveTenantConfig` |
+| `/events` | `DomainEvent`, `EventMeta`, `EventHandler`, `EventLogger`, `EventTransport`, `DeadLetteredEvent`, `PublishManyResult`, `createEvent`, `createChildEvent`, `matchEventPattern` |
 | `/result` | `Result<T, E>`, `ok`, `err`, `isOk`, `isErr`, `mapResult`, `mapError`, `unwrap` |
 | `/brand` | `Brand<T, B>`, `Prettify`, `DeepPartial`, `DeepReadonly`, `RequireKeys`, `OptionalKeys`, `Nullable`, `KeysMatching`, `NonEmptyArray` |
-| `/errors` | `ErrorContract`, `ErrorDetail`, `ErrorCode`, `ERROR_CODES` |
 | `/split-allocation` | `allocate`, `isBalanced`, `SplitAllocationError`, `SplitMethod`, `SplitSubject`, `SplitPart`, `SplitResult` |
 | `/approval` | `createChain`, `applyDecision`, `skipStep`, `nextPendingStep`, `pendingSteps`, `isApproved`, `isRejected`, `isPending`, `decisionCount`, `ApprovalError`, `ApprovalChain`, `ApprovalStep`, `ApprovalDecision`, `Approver`, `ApprovalThreshold` |
 | `/cadence` | `nextOccurrence`, `occurrencesBetween`, `validateCadence`, `CadenceError`, `Cadence`, `DailyCadence`, `WeeklyCadence`, `MonthlyCadence`, `YearlyCadence`, `CronCadence`, `IsoWeekday` |
@@ -91,21 +113,19 @@ Shape matches `@classytic/arc`'s `DomainEvent` exactly — any Arc transport
 (memory, Redis pub/sub, Redis Streams, Kafka) plugs into a package expecting
 this interface without adapters. See PACKAGE_RULES.md §11.
 
-### TenantConfig — one shape, every package
+### TenantConfig — moved to `@classytic/repo-core/tenant`
 
 ```ts
-import { resolveTenantConfig } from '@classytic/primitives/tenant';
+import { resolveTenantConfig } from '@classytic/repo-core/tenant';
 
 const tenant = resolveTenantConfig(config.tenant);
 // { enabled: true, tenantField: 'organizationId', fieldType: 'objectId',
 //   ref: 'organization', contextKey: 'organizationId', required: true }
 ```
 
-Field names match `@classytic/mongokit`'s `MultiTenantOptions` so you can
-forward the resolved config straight into `multiTenantPlugin(resolved)`.
-
-Packages stop rolling five flavours of `{ field, type, ref, contextKey,
-enabled }`.
+Mongokit's `MultiTenantOptions` and sqlitekit's equivalent both
+`extends Pick<TenantConfig, ...>` from repo-core — pass the resolved config
+straight into `multiTenantPlugin(resolved)`.
 
 ### ExternalRef — polymorphic, framework-free
 
@@ -127,7 +147,8 @@ ObjectId, UUID, Stripe ID, anything. See PACKAGE_RULES.md §7.
 - **Transaction / Order / Cart shapes** — those are domain types, not
   primitives. They live in their respective packages.
 - **Error subclasses** — throw plain `Error`s; hosts serialize them into
-  `ErrorContract` at the HTTP boundary.
+  `ErrorContract` (from `@classytic/repo-core/errors`) at the HTTP boundary
+  via `toErrorContract(err)`.
 - **Runtime currency database** — ship a whitelist at the app layer if you
   need one. `MINOR_UNIT_FACTOR` covers common cases.
 

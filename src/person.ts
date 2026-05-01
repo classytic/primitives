@@ -22,7 +22,16 @@ export function formatFullName(name: PersonName): string {
 
 export function formatDisplayName(name: PersonName): string {
   if (name.preferred?.trim()) return name.preferred;
-  return `${name.given} ${name.family}`.trim();
+  // Use the same nullish-filtered join `formatFullName` uses so that an
+  // empty `PersonName` (e.g. a customer auto-created at checkout with no
+  // profile name yet) yields an empty string instead of the literal
+  // `"undefined undefined"`. Template-literal interpolation of undefined
+  // is a footgun — `${undefined} ${undefined}`.trim() → "undefined
+  // undefined". Filter Boolean(p?.trim()) to keep both "spaces only"
+  // and `undefined` parts out of the output.
+  return [name.given, name.family]
+    .filter((p): p is string => Boolean(p?.trim()))
+    .join(' ');
 }
 
 /**

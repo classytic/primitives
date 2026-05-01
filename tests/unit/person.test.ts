@@ -39,4 +39,22 @@ describe('formatDisplayName', () => {
     const n: PersonName = { given: 'Ada', family: 'Lovelace', preferred: '   ' };
     expect(formatDisplayName(n)).toBe('Ada Lovelace');
   });
+
+  it('returns empty string when both given and family are missing', () => {
+    // Pre-fix this returned the literal "undefined undefined" — see
+    // the comment in `formatDisplayName` for the template-literal
+    // footgun this guards against.
+    const n: PersonName = {} as PersonName;
+    expect(formatDisplayName(n)).toBe('');
+  });
+
+  it('returns empty string when both given and family are empty/whitespace', () => {
+    const n: PersonName = { given: '', family: '   ' };
+    expect(formatDisplayName(n)).toBe('');
+  });
+
+  it('keeps just the populated half when only one of given/family is set', () => {
+    expect(formatDisplayName({ given: 'Sadman', family: '' })).toBe('Sadman');
+    expect(formatDisplayName({ given: '', family: 'Chowdhury' })).toBe('Chowdhury');
+  });
 });

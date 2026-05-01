@@ -3,6 +3,66 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-29
+
+### Removed — `/errors` subpath (BREAKING)
+
+- Deleted `@classytic/primitives/errors` (`ErrorContract`, `ErrorDetail`, `ErrorCode`, `ERROR_CODES`).
+- Errors are infrastructure-shaped (HTTP-coupled, repository-coupled, RFC 7807-shaped). Moved to `@classytic/repo-core/errors` where they sit next to `pagination`, `tenant`, `cache`, `hooks`, `schema` — every other repository contract — and join the existing `HttpError` throwable contract there. Single canonical home for both the wire (`ErrorContract`) and throwable (`HttpError`) shapes.
+
+#### Migration
+
+```diff
+- import type { ErrorContract, ErrorDetail, ErrorCode } from '@classytic/primitives/errors';
+- import { ERROR_CODES } from '@classytic/primitives/errors';
++ import type { ErrorContract, ErrorDetail, ErrorCode } from '@classytic/repo-core/errors';
++ import { ERROR_CODES } from '@classytic/repo-core/errors';
+```
+
+Field shapes and code values are unchanged — pure relocation.
+
+### Removed — `/tenant` subpath (BREAKING)
+
+- Deleted `@classytic/primitives/tenant` (`TenantConfig`, `TenantStrategy`, `TenantFieldType`, `DEFAULT_TENANT_CONFIG`, `resolveTenantConfig`, `ResolvedTenantConfig`).
+- Tenant scope is **infrastructure-shaped** (describes how queries get scoped to a database / repository), not a domain primitive like Money or Address. Moved to `@classytic/repo-core/tenant` where it sits next to `context`, `filter`, `hooks`, `schema`, `cache` — every other repository contract.
+- Mongokit and sqlitekit already peer-dep `@classytic/repo-core`, so consuming `TenantConfig` from there costs zero extra peer deps for those kits.
+
+#### Migration
+
+```diff
+- import type { TenantConfig } from '@classytic/primitives/tenant';
+- import { resolveTenantConfig, DEFAULT_TENANT_CONFIG } from '@classytic/primitives/tenant';
++ import type { TenantConfig } from '@classytic/repo-core/tenant';
++ import { resolveTenantConfig, DEFAULT_TENANT_CONFIG } from '@classytic/repo-core/tenant';
+```
+
+Field shapes, runtime semantics, and defaults are unchanged. The custom-strategy escape hatch (`strategy: 'custom'` + `resolve: (ctx) => filterShape`) works identically.
+
+### Removed — `/pagination` subpath (BREAKING)
+
+- Deleted `@classytic/primitives/pagination` (`PageParams`, `KeysetParams`, `SortSpec`, `SortDirection`, `OffsetPage<T>`, `KeysetPage<T>`, `AggregatePage<T>`, `emptyOffsetPage`, `emptyKeysetPage`).
+- Pagination shapes are owned by **`@classytic/repo-core/pagination`** — that package ships both the types AND the cursor encoding/skip-math/keyset-validation algorithms. Primitives' duplicate type-only declarations existed before the contract was canonised in repo-core; keeping them invited drift.
+
+### Migration
+
+```diff
+- import type { OffsetPage, KeysetPage, AggregatePage, SortSpec } from '@classytic/primitives/pagination';
++ import type {
++   OffsetPaginationResult,
++   KeysetPaginationResult,
++   AggregatePaginationResult,
++   SortSpec,
++ } from '@classytic/repo-core/pagination';
+```
+
+Note: shape names also changed (`OffsetPage` → `OffsetPaginationResult`, etc.) to match repo-core's naming. Field names align with what mongokit, sqlitekit, and arc already produced — those packages always returned repo-core shapes; primitives' types were a parallel, never-quite-aligned vocabulary.
+
+If you also need HTTP wire envelopes (`{ success: true } & Result`), repo-core 0.3.0 ships `OffsetPaginationResponse`, `KeysetPaginationResponse`, `AggregatePaginationResponse`, `BareListResponse`, `PaginatedResponse`, plus a `toCanonicalList()` runtime normalizer.
+
+### Why now (and why this is the only breaking change in this release)
+
+Two layers of pagination shapes drifted across the org: primitives declared one set, repo-core declared a different set, mongokit + sqlitekit + arc all consumed repo-core's. Removing primitives' set is purely subtractive — nobody internally imports from `@classytic/primitives/pagination`, and external consumers get a clear migration path to repo-core. No new ground to break later.
+
 ## [0.2.0]
 
 ### Added

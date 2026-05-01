@@ -11,7 +11,6 @@ import { matchEventPattern } from '../../src/events.js';
 import type { Money } from '../../src/money.js';
 import type { DateRange } from '../../src/period.js';
 import type { ExternalRef } from '../../src/reference.js';
-import type { TenantConfig } from '../../src/tenant.js';
 
 export function makeMoney(overrides: Partial<Money> = {}): Money {
   return { amount: 1000, currency: 'USD', ...overrides };
@@ -39,18 +38,6 @@ export function makeOperationContext(overrides: Partial<OperationContext> = {}):
     organizationId: 'org_1',
     traceId: 'trace_1',
     correlationId: 'corr_1',
-    ...overrides,
-  };
-}
-
-export function makeTenantConfig(overrides: Partial<TenantConfig> = {}): TenantConfig {
-  return {
-    enabled: true,
-    tenantField: 'organizationId',
-    fieldType: 'objectId',
-    ref: 'organization',
-    contextKey: 'organizationId',
-    required: true,
     ...overrides,
   };
 }
