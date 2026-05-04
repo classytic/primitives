@@ -106,6 +106,21 @@ export interface StateMachine<TStatus extends string> {
    * `entityId` is included in the error for traceability.
    */
   assertTransition(entityId: string, from: TStatus, to: TStatus): void;
+  /**
+   * Forward lookup — every status the aggregate can move TO from `from`.
+   * Useful for UI dropdowns ("which actions are legal right now?") and
+   * for fanning a single source state into a multi-source CAS via a
+   * repo's `claim({ from: machine.validTargets(current), to })`.
+   */
+  validTargets(from: TStatus): readonly TStatus[];
+  /**
+   * Reverse lookup — every status that can transition INTO `to`. Pair
+   * with a repo's multi-source `claim({ from: machine.validSources(to), to })`
+   * when the target is fixed but the caller doesn't yet know the
+   * current state (or wants to authorize ALL legal predecessors in one
+   * round-trip).
+   */
+  validSources(to: TStatus): readonly TStatus[];
   /** The raw transition table — exposed read-only for advanced callers. */
   readonly transitions: Readonly<Record<TStatus, readonly TStatus[]>>;
 }
@@ -117,12 +132,26 @@ export function defineStateMachine<TStatus extends string>(
 
   // Pre-compute terminal statuses (those with empty outgoing list).
   const terminal = new Set<TStatus>();
+  // Pre-compute the reverse adjacency map (`to → readonly TStatus[]`) so
+  // `validSources` is O(1) lookup. Built once at definition time; the
+  // `Object.freeze`ed arrays make the result safe to expose by reference.
+  const reverse = new Map<TStatus, TStatus[]>();
   for (const [status, allowed] of Object.entries(transitions) as [
     TStatus,
     readonly TStatus[],
   ][]) {
     if (allowed.length === 0) terminal.add(status);
+    for (const target of allowed) {
+      const sources = reverse.get(target);
+      if (sources) sources.push(status);
+      else reverse.set(target, [status]);
+    }
   }
+  const frozenReverse = new Map<TStatus, readonly TStatus[]>();
+  for (const [target, sources] of reverse) {
+    frozenReverse.set(target, Object.freeze(sources.slice()) as readonly TStatus[]);
+  }
+  const EMPTY: readonly TStatus[] = Object.freeze([]) as readonly TStatus[];
 
   const buildError = errorFactory
     ? errorFactory
@@ -146,5 +175,104 @@ export function defineStateMachine<TStatus extends string>(
         throw buildError({ entityType: name, entityId, from, to });
       }
     },
+    validTargets(from) {
+      return transitions[from] ?? EMPTY;
+    },
+    validSources(to) {
+      return frozenReverse.get(to) ?? EMPTY;
+    },
   };
+}
+
+/**
+ * Minimal structural type for any kit's `claim()` operation. Lets
+ * `assertAndClaim` work against `@classytic/mongokit` (and future
+ * sqlitekit / pgkit) without primitives taking a hard peer dep.
+ *
+ * Mirrors the mongokit 3.13 `Repository.claim()` signature with
+ * `unknown`-typed values where the kit-specific shape (ObjectId, etc.)
+ * doesn't concern the state-machine layer.
+ */
+export interface ClaimableRepo<TDoc> {
+  claim(
+    id: string,
+    transition: {
+      field?: string;
+      from: unknown | readonly unknown[];
+      to: unknown;
+      where?: Record<string, unknown>;
+    },
+    patch?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<TDoc | null>;
+}
+
+/**
+ * Pair a state-machine `assertTransition()` (sync domain check) with a
+ * repo's `claim()` (runtime concurrency CAS) in one call. This is the
+ * canonical state-machine-backed CAS pattern documented in mongokit
+ * 3.13's CLAUDE.md.
+ *
+ *   - `assertTransition` rejects malformed transitions BEFORE we hit the
+ *     database (compile-time-typed targets, sync, fast).
+ *   - `claim` rejects concurrent writers AT the database (atomic
+ *     CAS, returns `null` on race-loss).
+ *
+ * Skipping either layer leaves a hole: skip `assertTransition` and bad
+ * transitions reach storage; skip `claim` and concurrent writers race.
+ *
+ * `from` accepts a single status OR an array of statuses (multi-source
+ * CAS). When the array form is used, `assertTransition` is asserted for
+ * EVERY listed source — a single illegal source aborts the call before
+ * the round-trip.
+ *
+ * @example Single-source
+ * ```ts
+ * const updated = await assertAndClaim(WAVE_MACHINE, repo, waveId, {
+ *   from: 'planned',
+ *   to: 'released',
+ *   patch: { releasedAt: new Date() },
+ *   options: { organizationId: ctx.organizationId, session },
+ * });
+ * if (!updated) throw new ConcurrencyError(); // race-loss
+ * ```
+ *
+ * @example Multi-source via `validSources`
+ * ```ts
+ * const updated = await assertAndClaim(WAVE_MACHINE, repo, waveId, {
+ *   from: WAVE_MACHINE.validSources('cancelled'), // every legal predecessor
+ *   to: 'cancelled',
+ *   patch: { cancelledAt: new Date() },
+ *   options: { organizationId: ctx.organizationId },
+ * });
+ * ```
+ */
+export async function assertAndClaim<TDoc, TStatus extends string>(
+  machine: StateMachine<TStatus>,
+  repo: ClaimableRepo<TDoc>,
+  id: string,
+  args: {
+    from: TStatus | readonly TStatus[];
+    to: TStatus;
+    field?: string;
+    patch?: Record<string, unknown>;
+    where?: Record<string, unknown>;
+    options?: Record<string, unknown>;
+  },
+): Promise<TDoc | null> {
+  const sources = Array.isArray(args.from) ? args.from : [args.from as TStatus];
+  for (const from of sources) {
+    machine.assertTransition(id, from, args.to);
+  }
+  return repo.claim(
+    id,
+    {
+      from: Array.isArray(args.from) ? (args.from as readonly TStatus[]) : (args.from as TStatus),
+      to: args.to,
+      ...(args.field !== undefined ? { field: args.field } : {}),
+      ...(args.where !== undefined ? { where: args.where } : {}),
+    },
+    args.patch,
+    args.options,
+  );
 }

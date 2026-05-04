@@ -3,6 +3,70 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-05-02
+
+### Added — state-machine ↔ mongokit/sqlitekit integration
+
+State-machine primitives now compose directly with the kit-level CAS surface shipped in mongokit 3.13 and the sqlitekit follow-up. Three additions:
+
+- **`StateMachine.validTargets(from)`** — every status the aggregate can move TO from `from`. Useful for UI dropdowns ("which actions are legal right now?") and for fanning a single source state into a multi-source CAS via a repo's `claim({ from: machine.validTargets(current), to })`.
+- **`StateMachine.validSources(to)`** — every status that can transition INTO `to` (reverse adjacency). Pair with a repo's multi-source `claim({ from: machine.validSources(to), to })` when the target is fixed but the caller doesn't yet know the current state — the canonical "cancel from any non-terminal" / "error from any in-flight" pattern. Pre-computed at definition time, O(1) lookup, frozen arrays safe to expose by reference.
+- **`assertAndClaim(machine, repo, id, args)`** — pairs `machine.assertTransition` (sync domain check) with `repo.claim()` (atomic CAS) in one call. The canonical state-machine-backed CAS pattern. Skipping either layer leaves a hole: skip `assertTransition` and bad transitions reach storage; skip `claim` and concurrent writers race.
+
+```ts
+import { defineStateMachine, assertAndClaim } from '@classytic/primitives/state-machine';
+
+const ORDER_MACHINE = defineStateMachine<OrderStatus>({
+  name: 'Order',
+  transitions: {
+    draft:     ['approved', 'cancelled'],
+    approved:  ['shipped', 'cancelled'],
+    shipped:   [],
+    cancelled: [],
+  },
+});
+
+// Single-source:
+const updated = await assertAndClaim(ORDER_MACHINE, orderRepo, orderId, {
+  from: 'draft',
+  to: 'approved',
+  patch: { approvedAt: new Date() },
+  options: { organizationId: ctx.organizationId, session },
+});
+
+// Multi-source via reverse adjacency — "cancel from any legal predecessor":
+await assertAndClaim(ORDER_MACHINE, orderRepo, orderId, {
+  from: ORDER_MACHINE.validSources('cancelled'), // ['draft', 'approved']
+  to: 'cancelled',
+  patch: { cancelledAt: new Date() },
+  options: { organizationId: ctx.organizationId },
+});
+```
+
+#### `ClaimableRepo<TDoc>` — structural dependency on the kit
+
+`assertAndClaim` accepts any object matching `ClaimableRepo<TDoc>` — a structural type that mirrors the mongokit 3.13 `Repository.claim()` signature. Primitives doesn't take a hard peer dep on mongokit; consumers wire the kit they want. Sqlitekit's `claim()` matches the same shape (verified by mongokit/sqlitekit cross-conformance).
+
+```ts
+export interface ClaimableRepo<TDoc> {
+  claim(
+    id: string,
+    transition: {
+      field?: string;
+      from: unknown | readonly unknown[];
+      to: unknown;
+      where?: Record<string, unknown>;
+    },
+    patch?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<TDoc | null>;
+}
+```
+
+#### Why a 0.3.1 (not 0.4.0)
+
+Purely additive — no removals, no signature changes. `defineStateMachine` callers from 0.3.0 see two new methods on the returned `StateMachine` (`validTargets`, `validSources`) and one new free function (`assertAndClaim`). Backwards-compatible.
+
 ## [0.3.0] - 2026-04-29
 
 ### Removed — `/errors` subpath (BREAKING)

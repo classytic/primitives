@@ -6,8 +6,10 @@
  * one machine per aggregate.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  assertAndClaim,
+  type ClaimableRepo,
   defineStateMachine,
   IllegalTransitionError,
   type TransitionErrorContext,
@@ -155,6 +157,125 @@ describe('defineStateMachine', () => {
   describe('table is read-only at runtime', () => {
     it('exposes the transitions map for inspection', () => {
       expect(ORDER_MACHINE.transitions.draft).toEqual(['approved', 'cancelled']);
+    });
+  });
+
+  describe('validTargets', () => {
+    it('returns the readonly forward adjacency for a non-terminal status', () => {
+      expect(ORDER_MACHINE.validTargets('draft')).toEqual(['approved', 'cancelled']);
+      expect(ORDER_MACHINE.validTargets('approved')).toEqual(['received', 'cancelled']);
+    });
+
+    it('returns an empty array for terminal statuses', () => {
+      expect(ORDER_MACHINE.validTargets('received')).toEqual([]);
+      expect(ORDER_MACHINE.validTargets('cancelled')).toEqual([]);
+    });
+  });
+
+  describe('validSources', () => {
+    it('returns every source status that can transition INTO `to` (reverse adjacency)', () => {
+      // approved is reachable only from draft
+      expect(ORDER_MACHINE.validSources('approved')).toEqual(['draft']);
+      // cancelled is reachable from draft AND approved
+      const cancelledSources = [...ORDER_MACHINE.validSources('cancelled')].sort();
+      expect(cancelledSources).toEqual(['approved', 'draft']);
+      // received is reachable only from approved
+      expect(ORDER_MACHINE.validSources('received')).toEqual(['approved']);
+    });
+
+    it('returns an empty array for unreachable statuses', () => {
+      // draft has no inbound transitions in this table
+      expect(ORDER_MACHINE.validSources('draft')).toEqual([]);
+    });
+  });
+
+  describe('assertAndClaim — sync assert + atomic CAS pairing', () => {
+    type Doc = { _id: string; status: Status };
+
+    function makeRepo(result: Doc | null = { _id: 'x', status: 'approved' }): ClaimableRepo<Doc> & {
+      claim: ReturnType<typeof vi.fn>;
+    } {
+      return {
+        claim: vi.fn(async () => result),
+      };
+    }
+
+    it('asserts machine table THEN forwards to repo.claim with the same shape', async () => {
+      const repo = makeRepo();
+      const updated = await assertAndClaim(ORDER_MACHINE, repo, 'po-1', {
+        from: 'draft',
+        to: 'approved',
+        patch: { approvedAt: new Date('2026-01-01') },
+        options: { organizationId: 'org-1' },
+      });
+
+      expect(updated).toEqual({ _id: 'x', status: 'approved' });
+      expect(repo.claim).toHaveBeenCalledTimes(1);
+      const [id, transition, patch, options] = repo.claim.mock.calls[0];
+      expect(id).toBe('po-1');
+      expect(transition).toMatchObject({ from: 'draft', to: 'approved' });
+      expect(patch).toMatchObject({ approvedAt: new Date('2026-01-01') });
+      expect(options).toMatchObject({ organizationId: 'org-1' });
+    });
+
+    it('throws BEFORE round-tripping when the transition is illegal', async () => {
+      const repo = makeRepo();
+      await expect(
+        assertAndClaim(ORDER_MACHINE, repo, 'po-1', {
+          from: 'received', // terminal — no targets
+          to: 'cancelled',
+        }),
+      ).rejects.toThrow(IllegalTransitionError);
+      expect(repo.claim).not.toHaveBeenCalled();
+    });
+
+    it('returns null on race-loss (passthrough from repo.claim)', async () => {
+      const repo = makeRepo(null);
+      const updated = await assertAndClaim(ORDER_MACHINE, repo, 'po-1', {
+        from: 'draft',
+        to: 'approved',
+      });
+      expect(updated).toBeNull();
+      expect(repo.claim).toHaveBeenCalledTimes(1);
+    });
+
+    it('multi-source via from: T[] — asserts EVERY listed source legal', async () => {
+      const repo = makeRepo();
+      // draft → cancelled and approved → cancelled both legal
+      await assertAndClaim(ORDER_MACHINE, repo, 'po-1', {
+        from: ['draft', 'approved'] as const,
+        to: 'cancelled',
+        options: { organizationId: 'org-1' },
+      });
+      expect(repo.claim).toHaveBeenCalledTimes(1);
+      expect(repo.claim.mock.calls[0][1]).toMatchObject({
+        from: ['draft', 'approved'],
+        to: 'cancelled',
+      });
+    });
+
+    it('multi-source rejects when ANY listed source is illegal', async () => {
+      const repo = makeRepo();
+      // received is terminal — listing it as a source for any target is illegal
+      await expect(
+        assertAndClaim(ORDER_MACHINE, repo, 'po-1', {
+          from: ['draft', 'received'] as const,
+          to: 'cancelled',
+        }),
+      ).rejects.toThrow(IllegalTransitionError);
+      expect(repo.claim).not.toHaveBeenCalled();
+    });
+
+    it('composes with validSources for "transition from any legal predecessor"', async () => {
+      const repo = makeRepo();
+      const sources = ORDER_MACHINE.validSources('cancelled');
+      await assertAndClaim(ORDER_MACHINE, repo, 'po-1', {
+        from: sources,
+        to: 'cancelled',
+      });
+      expect(repo.claim).toHaveBeenCalledTimes(1);
+      const passedFrom = (repo.claim.mock.calls[0][1] as { from: readonly string[] }).from;
+      expect([...passedFrom].sort()).toEqual(['approved', 'draft']);
     });
   });
 
