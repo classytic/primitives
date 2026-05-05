@@ -19,6 +19,8 @@ export default defineConfig({
     'src/sla.ts',
     'src/person.ts',
     'src/state-machine.ts',
+    'src/bank-transaction.ts',
+    'src/payment-gateway.ts',
   ],
   format: ['esm'],
   dts: { sourcemap: false },

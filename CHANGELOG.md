@@ -3,6 +3,96 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-05-05
+
+### Added — `/bank-transaction` subpath
+
+Canonical bank-feed shapes shared across `@classytic/fin-io` (parsers
+produce these), `@classytic/revenue` (`transactionRepository.import()`
+consumes them), and `@classytic/ledger` (`bankStatementMapper`
+consumes them). Single source of truth for the cross-package
+vocabulary; eliminates the structural mirrors fin-io and revenue
+were carrying.
+
+Exports: `BankTransaction`, `BankCounterparty`, `BankAccount`,
+`BankStatement`, `BankStatementSource`, `BankImportReport`,
+`BankImportRowError`. All anchored on `Money` from `/money` (integer
+minor units, `number`).
+
+### Added — `/payment-gateway` subpath
+
+Canonical payment-gateway data shapes. **Lets any provider package
+(Stripe, Razorpay, SSLCommerz, PayPal, bKash, Nagad, manual, …)
+implement against primitives' types without depending on revenue's
+heavyweight runtime.** Provider authors peer-dep on
+`@classytic/primitives` only.
+
+Exports: `CreateIntentParams`, `PaymentIntent`, `PaymentResult`,
+`RefundResult`, `WebhookEvent`, `ProviderCapabilities`. All `amount`
+fields are `Money` from `/money` (no flat `amount: number, currency:
+string` pairs — currency travels inside Money).
+
+The `PaymentProvider` abstract class — the *contract* every provider
+must satisfy — stays in `@classytic/revenue`. Revenue is the data
+engine that consumes providers; provider packages live elsewhere.
+
+### Architectural intent
+
+Revenue 3.0 + primitives 0.5 + fin-io 0.3 establish a clean
+three-tier seam:
+
+  1. **primitives** — pure data shapes (no runtime, no deps). Owns
+     `Money`, `BankTransaction`, `PaymentIntent`, every cross-
+     package vocabulary type.
+  2. **revenue** — the engine. Owns the abstract contracts
+     (`PaymentProvider`, `BankFeedProvider`), state machines, repos.
+     Consumes primitives shapes.
+  3. **provider packages** (`revenue-stripe`, `revenue-razorpay`,
+     `@classytic/fin-io/adapters/revenue`, …) — implementations.
+     Peer-dep on primitives. Optional peer-dep on revenue for the
+     abstract base class.
+
+This eliminates the cycle where every provider package transitively
+pulled mongoose + mongokit just to know what a `PaymentIntent`
+looked like. Tree-shaking, build times, and dep-graph honesty all
+improve.
+
+### Migration
+
+Consumers MUST import from primitives subpaths. No re-exports from
+revenue or fin-io (PACKAGE_RULES P2):
+
+```ts
+// Before
+import type { PaymentIntent, CreateIntentParams } from '@classytic/revenue';
+import type { CanonicalTransaction, Money } from '@classytic/fin-io';
+
+// After
+import type {
+  PaymentIntent,
+  CreateIntentParams,
+} from '@classytic/primitives/payment-gateway';
+import type { BankTransaction } from '@classytic/primitives/bank-transaction';
+import type { Money } from '@classytic/primitives/money';
+```
+
+Provider helper classes (`PaymentIntent`, `PaymentResult`,
+`RefundResult`, `WebhookEvent`) are deleted from revenue — they were
+trivial wrappers around plain objects. Provider implementations now
+return plain object literals matching the interface.
+
+`CreateIntentParams.amount` is now `Money` (`{ amount: number,
+currency: string }`), not the flat `amount + currency` pair. Revenue's
+repository wraps internally:
+
+```ts
+const intent = await provider.createIntent({
+  amount: { amount: params.amount, currency },
+  metadata: params.metadata,
+  ...params.paymentData,
+});
+```
+
 ## [0.3.1] - 2026-05-02
 
 ### Added — state-machine ↔ mongokit/sqlitekit integration
