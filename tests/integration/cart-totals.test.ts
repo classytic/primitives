@@ -18,7 +18,7 @@ import {
   subtractMoney,
   sumMoney,
   toMajor,
-} from '../../src/money.js';
+} from '../../src/money/money.js';
 
 interface CartLine {
   unitPrice: { amount: number; currency: string };

@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { Money } from '../../src/money.js';
+import type { Money } from '../../src/money/money.js';
 import type {
   CreateIntentParams,
   PaymentIntent,
@@ -17,7 +17,7 @@ import type {
   ProviderCapabilities,
   RefundResult,
   WebhookEvent,
-} from '../../src/payment-gateway.js';
+} from '../../src/money/payment-gateway.js';
 
 describe('CreateIntentParams shape', () => {
   it('amount is Money (number minor units)', () => {

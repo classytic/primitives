@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDisplayName, formatFullName, type PersonName } from '../../src/person.js';
+import { formatDisplayName, formatFullName, type PersonName } from '../../src/identity/person.js';
 
 describe('formatFullName', () => {
   it('joins given + family with a space', () => {

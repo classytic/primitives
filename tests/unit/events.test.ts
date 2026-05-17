@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { DeadLetteredEvent, DomainEvent, EventMeta } from '../../src/events.js';
-import { createChildEvent, createEvent, matchEventPattern } from '../../src/events.js';
+import type { DeadLetteredEvent, DomainEvent, EventMeta } from '../../src/events/events.js';
+import { createChildEvent, createEvent, matchEventPattern } from '../../src/events/events.js';
 
 describe('createEvent', () => {
   it('fills id and timestamp automatically', () => {

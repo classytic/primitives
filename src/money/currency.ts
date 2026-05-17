@@ -1,4 +1,4 @@
-import type { Brand } from './brand.js';
+import type { Brand } from '../composition/brand.js';
 
 /**
  * ISO 4217 currency code (3 uppercase letters).

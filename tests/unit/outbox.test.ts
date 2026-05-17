@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { createEvent, type DeadLetteredEvent, type DomainEvent } from '../../src/events.js';
+import { createEvent, type DeadLetteredEvent, type DomainEvent } from '../../src/events/events.js';
 import {
   InvalidOutboxEventError,
   type OutboxAcknowledgeOptions,
@@ -12,7 +12,7 @@ import {
   OutboxOwnershipError,
   type OutboxStore,
   type OutboxWriteOptions,
-} from '../../src/outbox.js';
+} from '../../src/events/outbox.js';
 
 describe('OutboxOwnershipError', () => {
   it('stringifies the event id + attemptedBy + currentOwner', () => {

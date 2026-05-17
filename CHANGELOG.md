@@ -3,6 +3,76 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-05-17
+
+### Added — five new primitives for CRM / workflow domains
+
+Five new primitives covering gaps the existing surface didn't address.
+Each ships under its own flat subpath import (no breaking changes).
+
+- **`/phone`** — `PhoneNumber` value object + `parsePhone(input)` that
+  normalizes free-form input to E.164, captures the country calling code
+  as a discrete field, and reports failures via `Result<PhoneNumber,
+  PhoneError>`. Zero external deps; ITU-T E.164 prefixes inlined. Hosts
+  that want region-of-issue / line-type detection layer on top with
+  libphonenumber-js.
+
+- **`/status-history`** — Generic, immutable status-change log:
+  `StatusChangeEntry<TStatus>`, `appendStatus()`, `timeInStatus()`,
+  `lastTransitionTo()`. Captures `durationInPriorMs` at write time so
+  funnel-velocity dashboards ("avg time in Qualification") work without
+  re-walking timestamps. Pairs naturally with `/state-machine`.
+
+- **`/condition`** — Tiny JSON-serializable predicate DSL: `FieldCondition`
+  (`{ field, op, value }`) composed via `AllCondition` / `AnyCondition`
+  / `NotCondition`, plus a total `evaluate(condition, target)` and a
+  `validateCondition()` for boot-time schema checks. Powers SLA scope
+  filters, drip "if opened/clicked" branches, automation triggers, and
+  permission row-scopes — anywhere a predicate needs to round-trip
+  through a database.
+
+- **`/mixin`** — Additive type composition without subclassing:
+  `withMixin<T, K, M>()` / `getMixin()` / `hasMixin()` / `withoutMixin()`.
+  Lets a `Contact` carry per-domain payloads (`mixins.customer`,
+  `mixins.lead-fit`) on a typed `mixins` namespace without bloating the
+  base type. Plain object composition — no decorators, no global
+  hierarchy, no proxies.
+
+- **`/sla-policy`** — Higher-order SLA layered on the existing `/sla`:
+  priority matrix (`urgent` / `high` / `normal` → durations), first-
+  response vs rolling-response semantics, and working-hours window
+  (weekdays + start/end minute + holidays). `defineSLAPolicy()` validates
+  at boot; `evaluateSLAStatus()` produces `{ kind, responseBy,
+  remainingMs, breached }` from a policy + per-entity inputs. The
+  existing simple `/sla` interface is unchanged — `sla-policy` derives
+  concrete `SLA` instances from a policy + priority and delegates to it.
+
+### Changed — source-tree reorganization (no public-surface impact)
+
+The 24 primitive source files moved from a flat `src/*.ts` layout into
+six category folders so the package is self-documenting at the file
+system level:
+
+```
+src/
+  money/           money, currency, split-allocation, bank-transaction, payment-gateway
+  identity/        person, address, phone
+  scheduling/      period, cadence, sla, sla-policy
+  workflow/        state-machine, status-history, approval, hold, condition
+  events/          events, outbox
+  composition/     mixin, reference, context, brand, result
+```
+
+**Public subpath imports are unchanged** — `@classytic/primitives/money`,
+`@classytic/primitives/sla`, etc. still resolve. tsdown emits each entry
+to `dist/<name>.mjs` regardless of source nesting. Existing consumers
+upgrade with `npm install @classytic/primitives@^0.6.0` and a no-op
+diff.
+
+### Dependencies
+
+Still zero runtime deps. Node 22+.
+
 ## [0.5.0] - 2026-05-05
 
 ### Added — `/bank-transaction` subpath

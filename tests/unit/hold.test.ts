@@ -9,7 +9,7 @@ import {
   isOnHold,
   resolvedHolds,
   resolveHold,
-} from '../../src/hold.js';
+} from '../../src/workflow/hold.js';
 
 const systemActor: HoldActor = { id: 'system', kind: 'system' };
 const userActor: HoldActor = { id: 'user_1', kind: 'user', name: 'Alice' };

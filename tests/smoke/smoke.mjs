@@ -37,6 +37,17 @@ const checks = [
   ['./brand', null],
   ['./state-machine', 'defineStateMachine'],
   ['./state-machine', 'IllegalTransitionError'],
+  // ─── 0.6.0 additions ─────────────────────────────────────────────────
+  ['./phone', 'parsePhone'],
+  ['./phone', 'formatPhone'],
+  ['./status-history', 'appendStatus'],
+  ['./status-history', 'timeInStatus'],
+  ['./condition', 'evaluate'],
+  ['./condition', 'validateCondition'],
+  ['./mixin', 'withMixin'],
+  ['./mixin', 'getMixin'],
+  ['./sla-policy', 'defineSLAPolicy'],
+  ['./sla-policy', 'evaluateSLAStatus'],
 ];
 
 const failures = [];
@@ -100,6 +111,64 @@ try {
 assert.ok(smThrew instanceof IllegalTransitionError, 'state-machine: expected IllegalTransitionError');
 assert.equal(smThrew.code, 'illegal_transition');
 assert.equal(smThrew.entityId, 'id-1');
+
+// Functional smoke: 0.6.0 additions — end-to-end flow combining all five.
+const { parsePhone } = await loadDist(pkg.exports['./phone'].default);
+const { appendStatus, timeInStatus } = await loadDist(pkg.exports['./status-history'].default);
+const { evaluate } = await loadDist(pkg.exports['./condition'].default);
+const { withMixin, getMixin } = await loadDist(pkg.exports['./mixin'].default);
+const { defineSLAPolicy, evaluateSLAStatus } = await loadDist(
+  pkg.exports['./sla-policy'].default,
+);
+
+// phone: free-form input → E.164 + decomposed country code.
+const phone = parsePhone('+1 (415) 555-0182');
+assert.equal(phone.ok, true);
+assert.equal(phone.value.e164, '+14155550182');
+assert.equal(phone.value.callingCode, '1');
+
+// status-history: timeline math is correct and immutable.
+const t0 = new Date('2026-01-01T10:00:00Z');
+const t1 = new Date('2026-01-01T10:30:00Z');
+let history = appendStatus([], 'new', { at: t0 });
+history = appendStatus(history, 'qualified', { at: t1 });
+assert.equal(history[1].durationInPriorMs, 30 * 60_000);
+assert.equal(timeInStatus(history, 'new'), 30 * 60_000);
+
+// condition: composite predicate against a target object.
+assert.equal(
+  evaluate(
+    { all: [{ field: 'status', op: 'eq', value: 'won' }, { field: 'score', op: 'gt', value: 50 }] },
+    { status: 'won', score: 75 },
+  ),
+  true,
+);
+
+// mixin: additive composition reads back through getMixin.
+const enriched = withMixin({ id: 'c1' }, 'customer', { lifetimeValue: 9200 });
+assert.equal(getMixin(enriched, 'customer').lifetimeValue, 9200);
+
+// sla-policy: priority matrix → derived SLA → status evaluation.
+const slaPolicy = defineSLAPolicy({
+  name: 'lead-response',
+  priorities: {
+    urgent: { firstResponseMs: 30 * 60_000, rollingResponseMs: 60 * 60_000 },
+    normal: { firstResponseMs: 8 * 3_600_000, rollingResponseMs: 24 * 3_600_000 },
+  },
+  defaultPriority: 'normal',
+});
+const status = evaluateSLAStatus(
+  slaPolicy,
+  {
+    priority: 'urgent',
+    startedAt: new Date('2026-01-01T10:00:00Z'),
+    firstRespondedAt: null,
+    lastRespondedAt: null,
+  },
+  new Date('2026-01-01T11:00:00Z'),
+);
+assert.equal(status.kind, 'Failed');
+assert.equal(status.breached, true);
 
 if (failures.length > 0) {
   console.error('\n smoke FAILED:');

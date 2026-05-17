@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { Money } from '../../src/money.js';
+import type { Money } from '../../src/money/money.js';
 import type {
   BankAccount,
   BankCounterparty,
@@ -19,7 +19,7 @@ import type {
   BankStatement,
   BankStatementSource,
   BankTransaction,
-} from '../../src/bank-transaction.js';
+} from '../../src/money/bank-transaction.js';
 
 describe('BankTransaction shape', () => {
   it('uses Money (number minor units) — not bigint, not float', () => {

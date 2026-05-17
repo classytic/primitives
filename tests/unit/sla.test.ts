@@ -8,7 +8,7 @@ import {
   type SLA,
   type SLAError,
   validateSLA,
-} from '../../src/sla.js';
+} from '../../src/scheduling/sla.js';
 
 const twoHours: SLA = {
   targetDurationMs: 2 * 60 * 60 * 1000,

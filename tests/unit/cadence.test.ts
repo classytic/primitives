@@ -5,7 +5,7 @@ import {
   nextOccurrence,
   occurrencesBetween,
   validateCadence,
-} from '../../src/cadence.js';
+} from '../../src/scheduling/cadence.js';
 
 const iso = (s: string) => new Date(s);
 

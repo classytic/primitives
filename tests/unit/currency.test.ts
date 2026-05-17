@@ -9,7 +9,7 @@ import {
   minorUnitFactor,
   reverseWithSnapshot,
   toCurrencyCode,
-} from '../../src/currency.js';
+} from '../../src/money/currency.js';
 
 describe('toCurrencyCode', () => {
   it('accepts any 3 uppercase letters', () => {

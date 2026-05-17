@@ -10,8 +10,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { DomainEvent } from '../../src/events.js';
-import { createEvent } from '../../src/events.js';
+import type { DomainEvent } from '../../src/events/events.js';
+import { createEvent } from '../../src/events/events.js';
 import { makeInProcessBus, makeOperationContext } from '../helpers/fixtures.js';
 
 describe('primitives compose into an Arc-shaped event bus', () => {

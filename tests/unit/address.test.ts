@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fromGeoJsonPoint, toGeoJsonPoint } from '../../src/address.js';
+import { fromGeoJsonPoint, toGeoJsonPoint } from '../../src/identity/address.js';
 import { makeGeoPoint } from '../helpers/fixtures.js';
 
 describe('toGeoJsonPoint', () => {

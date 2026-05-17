@@ -13,7 +13,7 @@ import {
   defineStateMachine,
   IllegalTransitionError,
   type TransitionErrorContext,
-} from '../../src/state-machine.js';
+} from '../../src/workflow/state-machine.js';
 
 type Status = 'draft' | 'approved' | 'received' | 'cancelled';
 

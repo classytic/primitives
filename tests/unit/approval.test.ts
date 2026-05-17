@@ -11,7 +11,7 @@ import {
   nextPendingStep,
   pendingSteps,
   skipStep,
-} from '../../src/approval.js';
+} from '../../src/workflow/approval.js';
 
 function makeSimpleChain(): ApprovalChain {
   return createChain({

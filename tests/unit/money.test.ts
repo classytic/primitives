@@ -16,7 +16,7 @@ import {
   subtractMoney,
   sumMoney,
   toMajor,
-} from '../../src/money.js';
+} from '../../src/money/money.js';
 import { makeMoney } from '../helpers/fixtures.js';
 
 describe('money() — integer constructor', () => {

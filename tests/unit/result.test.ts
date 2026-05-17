@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { err, isErr, isOk, mapError, mapResult, ok, unwrap } from '../../src/result.js';
+import { err, isErr, isOk, mapError, mapResult, ok, unwrap } from '../../src/composition/result.js';
 
 describe('ok / err constructors', () => {
   it('builds a success variant', () => {

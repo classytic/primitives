@@ -6,7 +6,7 @@ import {
   type SplitMethod,
   type SplitResult,
   type SplitSubject,
-} from '../../src/split-allocation.js';
+} from '../../src/money/split-allocation.js';
 
 function sumOfParts(result: SplitResult): number {
   return result.parts.reduce((acc, p) => acc + p.amount, 0);

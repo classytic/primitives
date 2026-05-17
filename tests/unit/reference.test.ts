@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { idToString, isExternalRef } from '../../src/reference.js';
+import { idToString, isExternalRef } from '../../src/composition/reference.js';
 import { makeExternalRef } from '../helpers/fixtures.js';
 
 describe('idToString', () => {
