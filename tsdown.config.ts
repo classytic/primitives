@@ -23,6 +23,8 @@ export default defineConfig({
     'split-allocation': 'src/money/split-allocation.ts',
     'bank-transaction': 'src/money/bank-transaction.ts',
     'payment-gateway': 'src/money/payment-gateway.ts',
+    'payment-method-kind': 'src/money/payment-method-kind.ts',
+    'payment-allocation-status': 'src/money/payment-allocation-status.ts',
 
     // ─── identity ───────────────────────────────────────────────────────
     person: 'src/identity/person.ts',
@@ -45,6 +47,7 @@ export default defineConfig({
     // ─── events ─────────────────────────────────────────────────────────
     events: 'src/events/events.ts',
     outbox: 'src/events/outbox.ts',
+    'payment-events': 'src/events/payment-events.ts',
 
     // ─── composition ────────────────────────────────────────────────────
     mixin: 'src/composition/mixin.ts',

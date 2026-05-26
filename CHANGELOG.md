@@ -3,6 +3,27 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-05-26
+
+### Added — payment domain primitives
+
+Three new subpaths shared across every payment-aware package
+(`@classytic/invoice`, `@classytic/revenue`, `@classytic/order`, future
+POS / AP / subscription packages). Each ships under a flat subpath so
+consumers tree-shake what they don't import.
+
+- **`/payment-method-kind`** — `PaymentMethodKind` universal vocabulary
+  (kind vs host-registered `methodCode`) so packages can speak `kind`
+  while hosts speak `code`.
+- **`/payment-allocation-status`** — orthogonal allocation +
+  reconciliation status enums for payment legs (`unallocated`,
+  `partial`, `allocated`, `over_allocated`, plus reconciliation states).
+- **`/payment-events`** — pure TS payload contracts for payment domain
+  events. Wire-only (no Zod, no runtime). Anchored on `Money` +
+  `PaymentMethodKind`; causation/correlation stay on `EventMeta`.
+
+No breaking changes.
+
 ## [0.6.0] - 2026-05-17
 
 ### Added — five new primitives for CRM / workflow domains

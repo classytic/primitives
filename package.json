@@ -1,6 +1,6 @@
 {
   "name": "@classytic/primitives",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Framework-agnostic TypeScript primitives shared across Classytic packages — Money, events, pagination, tenant config, and other building blocks.",
   "author": "Classytic",
   "license": "MIT",
@@ -96,6 +96,18 @@
     "./payment-gateway": {
       "types": "./dist/payment-gateway.d.mts",
       "default": "./dist/payment-gateway.mjs"
+    },
+    "./payment-method-kind": {
+      "types": "./dist/payment-method-kind.d.mts",
+      "default": "./dist/payment-method-kind.mjs"
+    },
+    "./payment-allocation-status": {
+      "types": "./dist/payment-allocation-status.d.mts",
+      "default": "./dist/payment-allocation-status.mjs"
+    },
+    "./payment-events": {
+      "types": "./dist/payment-events.d.mts",
+      "default": "./dist/payment-events.mjs"
     },
     "./phone": {
       "types": "./dist/phone.d.mts",
