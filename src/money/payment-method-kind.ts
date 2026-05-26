@@ -11,6 +11,13 @@
  * (show wallet form vs card form vs cash form) while the host owns the
  * concrete method catalogue.
  *
+ * The enum is curated for distinct lifecycle / accounting / reporting
+ * characteristics, not provider variants. Provider-specific identification
+ * belongs in a host `methodCode` (e.g. `'stripe_card'`, `'bkash'`,
+ * `'klarna'`) and per-payment metadata. Consumers SHOULD handle unknown
+ * values defensively (fall through to `'other'` semantics) since the
+ * union may grow in future minor versions.
+ *
  * Zero runtime, zero deps. Mirror this exactly anywhere a payment leg's
  * "what kind of payment was this" needs to be typed.
  */
@@ -18,10 +25,20 @@
 export const PAYMENT_METHOD_KIND = {
   /** Credit / debit card — Visa, Mastercard, Amex, RuPay, UnionPay, … */
   CARD: 'card',
-  /** Direct bank transfer — ACH, SEPA, IMPS, NEFT, RTGS, wire, … */
+  /** Standard bank transfer — ACH credit, SEPA credit, IMPS, NEFT, RTGS, wire. */
   BANK_TRANSFER: 'bank_transfer',
-  /** Digital wallet — bKash, Nagad, PayPal, Apple Pay, Google Pay, Alipay, … */
+  /** Real-time bank rails — UPI, Pix, FedNow, PromptPay, FPX, GrabPay rails. */
+  INSTANT_BANK_TRANSFER: 'instant_bank_transfer',
+  /** Mandate-based bank pull — SEPA Direct Debit, ACH Debit, BACS Direct Debit, AU BECS. */
+  DIRECT_DEBIT: 'direct_debit',
+  /** Digital wallet — Apple Pay, Google Pay, Link, PayPal, Cashapp, Alipay, WeChat Pay, Revolut Pay. */
   WALLET: 'wallet',
+  /** Cash-in/out wallet infrastructure in unbanked markets — bKash, Nagad, M-Pesa, MoMo, GCash. */
+  MOBILE_MONEY: 'mobile_money',
+  /** Buy now pay later — Klarna, Afterpay, Affirm, Tabby, Tamara. */
+  BNPL: 'bnpl',
+  /** Customer-purchased prepaid credit / voucher. */
+  GIFT_CARD: 'gift_card',
   /** Physical cash. */
   CASH: 'cash',
   /** Paper cheque. */

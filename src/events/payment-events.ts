@@ -36,6 +36,13 @@ export const PAYMENT_EVENT_TYPE = {
   REFUNDED: 'payment.refunded',
   REVERSED: 'payment.reversed',
   RECONCILED: 'payment.reconciled',
+  AUTHORIZED: 'payment.authorized',
+  CAPTURED: 'payment.captured',
+  AUTH_VOIDED: 'payment.auth_voided',
+  DISPUTED: 'payment.disputed',
+  DISPUTE_WON: 'payment.dispute_won',
+  DISPUTE_LOST: 'payment.dispute_lost',
+  SETTLED: 'payment.settled',
 } as const satisfies Record<string, string>;
 
 export type PaymentEventType = (typeof PAYMENT_EVENT_TYPE)[keyof typeof PAYMENT_EVENT_TYPE];
@@ -120,6 +127,8 @@ export interface PaymentRefundedPayload {
   providerCode: string;
   /** Amount refunded in this event — may be less than the original payment. */
   refundedAmount: Money;
+  /** Original payment total — present so consumers can compute remaining refundable without a Payment lookup. */
+  originalAmount: Money;
   /** `true` if this refund returns less than the original payment total. */
   isPartial: boolean;
   reason?: string;
@@ -138,6 +147,12 @@ export interface PaymentReversedPayload {
   paymentId: string;
   providerRef?: string;
   providerCode: string;
+  /** Amount being unwound — equals the original payment for full reversal, less for partial. */
+  reversedAmount: Money;
+  /** Original payment total — present so consumers can detect partial vs full without a Payment lookup. */
+  originalAmount: Money;
+  /** `true` when reversedAmount < originalAmount. */
+  isPartial: boolean;
   reason: string;
   occurredAt: Date;
   metadata?: Record<string, unknown>;
@@ -165,6 +180,128 @@ export interface PaymentReconciledPayload {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Gateway has placed an authorisation hold but has NOT captured funds.
+ * Distinct from {@link PaymentSucceededPayload} — auth-only flows split
+ * "hold" from "settle"; consumers should NOT treat this as cleared funds.
+ */
+export interface PaymentAuthorizedPayload {
+  paymentId: string;
+  providerRef?: string;
+  providerCode: string;
+  /** Amount the gateway has placed a hold for — may be captured later in full or part. */
+  authorizedAmount: Money;
+  methodKind: PaymentMethodKind;
+  methodCode?: string;
+  /** When the auth hold expires if not captured — Stripe defaults to 7 days for cards. */
+  expiresAt?: Date;
+  occurredAt: Date;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Gateway has captured a previously-authorised payment — funds confirmed.
+ * Pairs with {@link PaymentAuthorizedPayload} for two-phase flows.
+ */
+export interface PaymentCapturedPayload {
+  paymentId: string;
+  providerRef?: string;
+  providerCode: string;
+  /** Amount actually captured — `<=` original auth. */
+  capturedAmount: Money;
+  /** Total authorised — present so consumers can compute remaining holdable. */
+  authorizedAmount: Money;
+  /** `true` when capturedAmount < authorizedAmount (partial capture). */
+  isPartial: boolean;
+  methodKind: PaymentMethodKind;
+  methodCode?: string;
+  occurredAt: Date;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Authorisation hold released — uncaptured auth voided before settlement.
+ */
+export interface PaymentAuthVoidedPayload {
+  paymentId: string;
+  providerRef?: string;
+  providerCode: string;
+  /** Amount released back to the customer's available balance. */
+  voidedAmount: Money;
+  reason?: string;
+  occurredAt: Date;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Customer / issuing bank opened a dispute or chargeback against this
+ * payment. The merchant typically has a deadline to submit evidence.
+ */
+export interface PaymentDisputedPayload {
+  paymentId: string;
+  /** Provider's dispute / chargeback id. */
+  disputeId: string;
+  providerRef?: string;
+  providerCode: string;
+  /** Amount being disputed — may be less than the original payment for partial chargebacks. */
+  disputedAmount: Money;
+  /** Provider's category — `'fraudulent'`, `'product_not_received'`, `'duplicate'`, etc. */
+  reason: string;
+  /** Provider lifecycle phase at the time of emit — `'warning_needs_response'`, `'needs_response'`, `'under_review'`. */
+  status: string;
+  /** When the host must submit evidence by, if applicable. */
+  evidenceDueBy?: Date;
+  occurredAt: Date;
+  metadata?: Record<string, unknown>;
+}
+
+/** Dispute resolved in merchant's favour — funds restored. */
+export interface PaymentDisputeWonPayload {
+  paymentId: string;
+  disputeId: string;
+  providerRef?: string;
+  providerCode: string;
+  /** Amount restored to the merchant. */
+  recoveredAmount: Money;
+  occurredAt: Date;
+  metadata?: Record<string, unknown>;
+}
+
+/** Dispute resolved against merchant — funds permanently lost plus fee. */
+export interface PaymentDisputeLostPayload {
+  paymentId: string;
+  disputeId: string;
+  providerRef?: string;
+  providerCode: string;
+  /** Amount permanently debited from the merchant. */
+  lostAmount: Money;
+  /** Dispute / chargeback fee the merchant pays in addition. */
+  feeAmount?: Money;
+  occurredAt: Date;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Funds have been settled to the merchant bank account by the gateway —
+ * the gross-vs-net delta is the processor fee. Use for bank-statement
+ * reconciliation in country-aware ledger bridges.
+ */
+export interface PaymentSettledPayload {
+  paymentId: string;
+  providerRef?: string;
+  providerCode: string;
+  /** Net amount transferred to the merchant bank account (gross - fees). */
+  settledAmount: Money;
+  /** Provider fee deducted before settlement. */
+  feeAmount?: Money;
+  /** Provider's payout / settlement batch identifier — useful for bank-statement matching. */
+  payoutId?: string;
+  /** When the funds become available in the merchant account. */
+  expectedArrivalAt?: Date;
+  occurredAt: Date;
+  metadata?: Record<string, unknown>;
+}
+
 /** Union of all payment event payload types — convenient for exhaustive switches. */
 export type PaymentEventPayload =
   | PaymentInitiatedPayload
@@ -172,4 +309,11 @@ export type PaymentEventPayload =
   | PaymentFailedPayload
   | PaymentRefundedPayload
   | PaymentReversedPayload
-  | PaymentReconciledPayload;
+  | PaymentReconciledPayload
+  | PaymentAuthorizedPayload
+  | PaymentCapturedPayload
+  | PaymentAuthVoidedPayload
+  | PaymentDisputedPayload
+  | PaymentDisputeWonPayload
+  | PaymentDisputeLostPayload
+  | PaymentSettledPayload;

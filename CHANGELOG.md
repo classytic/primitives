@@ -3,6 +3,28 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-05-26
+
+### Added — workflow + scheduling + composition primitives
+
+Four new flat subpaths (additive):
+
+- **`/status-history`** — append-only status transition log primitive.
+- **`/condition`** — declarative condition expressions for workflow gates.
+- **`/mixin`** — composition helpers for primitive object assembly.
+- **`/sla-policy`** — SLA policy definitions paired with the existing `/sla` runtime.
+
+### Added — payment event coverage
+
+Expanded `PAYMENT_EVENT_TYPE` catalogue to cover auth/capture and dispute
+lifecycles: `AUTHORIZED`, `CAPTURED`, `AUTH_VOIDED`, `DISPUTED`,
+`DISPUTE_WON`, `DISPUTE_LOST`, `SETTLED`.
+
+`PaymentRefundedPayload` and `PaymentReversedPayload` now carry
+`originalAmount` (and `reversedAmount` / `isPartial` on reversed) so
+consumers can detect partial vs full operations without a follow-up
+Payment lookup.
+
 ## [0.7.0] - 2026-05-26
 
 ### Added — payment domain primitives

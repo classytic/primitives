@@ -55,6 +55,7 @@
  */
 
 import type { Money } from './money.js';
+import type { PaymentMethodKind } from './payment-method-kind.js';
 
 // ─── Provider capabilities ───────────────────────────────────────────────
 
@@ -104,6 +105,30 @@ export interface CreateIntentParams {
   [key: string]: unknown;
 }
 
+// ─── Status unions ───────────────────────────────────────────────────────
+
+/**
+ * Closed set of intent lifecycle states the engine recognises. Modelled on
+ * Stripe's PaymentIntent status because every other gateway maps cleanly
+ * INTO this set; gateways that lack a state simply never emit it.
+ */
+export type PaymentIntentStatus =
+  | 'requires_payment_method'
+  | 'requires_confirmation'
+  | 'requires_action'
+  | 'processing'
+  | 'requires_capture'
+  | 'canceled'
+  | 'succeeded';
+
+/** Closed set of refund lifecycle states the engine recognises. */
+export type RefundResultStatus =
+  | 'pending'
+  | 'requires_action'
+  | 'succeeded'
+  | 'failed'
+  | 'canceled';
+
 // ─── Payment intent (creation result) ────────────────────────────────────
 
 /**
@@ -118,12 +143,10 @@ export interface PaymentIntent {
   /** Lowercase gateway name (`'stripe'`, `'razorpay'`, `'sslcommerz'`, `'bkash'`, `'manual'`). */
   provider: string;
   /**
-   * Lifecycle status as the gateway reports it. Free-form string —
-   * engine maps known values to its own state machine. Common values:
-   * `'pending'`, `'processing'`, `'requires_action'`, `'succeeded'`,
-   * `'failed'`, `'cancelled'`.
+   * Lifecycle status — closed union the engine state-machines branch on.
+   * Adapters MUST map provider-native strings into this set.
    */
-  status: string;
+  status: PaymentIntentStatus;
   /** Amount + currency that the intent locks in. */
   amount: Money;
 
@@ -145,6 +168,8 @@ export interface PaymentIntent {
   paymentUrl?: string;
   /** Manual-flow instructions ("transfer to A/c 1234, reference X"). */
   instructions?: string;
+  /** Canonical method kind if known at intent creation (customer pre-selected). */
+  methodKind?: PaymentMethodKind;
 
   /** Pass-through metadata echoed from the create call. */
   metadata?: Record<string, unknown>;
@@ -178,6 +203,8 @@ export interface PaymentResult {
   amount?: Money;
   /** When the gateway booked the capture. */
   paidAt?: Date;
+  /** Canonical method kind chosen by the customer (typically known post-settlement). */
+  methodKind?: PaymentMethodKind;
   /** Pass-through metadata (gateway customer id, fee breakdown, etc.). */
   metadata?: Record<string, unknown>;
   /** Raw response — audit only. */
@@ -195,7 +222,7 @@ export interface RefundResult {
   id: string;
   /** Lowercase gateway name. */
   provider: string;
-  status: 'succeeded' | 'failed' | 'processing';
+  status: RefundResultStatus;
 
   /** Amount reversed, as the gateway reports it. May be partial. */
   amount?: Money;
@@ -238,6 +265,16 @@ export interface WebhookEvent {
   };
   /** When the gateway emitted the event. */
   createdAt?: Date;
+  /** Canonical method kind derived from the event payload, when present. */
+  methodKind?: PaymentMethodKind;
+  /** Provider signature header value — kept for delayed verification / audit replay. */
+  signature?: string;
+  /** Signature timestamp the provider asserted — for replay-window enforcement. */
+  signatureTimestamp?: Date;
+  /** Connected-account id for multi-tenant routing — Stripe Connect uses `event.account`. */
+  accountId?: string;
+  /** Test vs production mode — Stripe's `livemode`. False / undefined = test. */
+  livemode?: boolean;
   /** Raw provider payload — audit only. */
   raw?: unknown;
 }
