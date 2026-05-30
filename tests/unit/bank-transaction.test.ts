@@ -94,6 +94,66 @@ describe('BankTransaction shape', () => {
     const m: Money | undefined = txn.balanceAfter;
     expect(m?.amount).toBe(50_000);
   });
+
+  it('sourceAccountId carries the vendor account for multi-account routing', () => {
+    // Sync feeds (Plaid/Xero) span multiple accounts per batch — each row
+    // names its own source account.
+    const fromAcctA: BankTransaction = {
+      externalId: 'plaid-1',
+      postedDate: new Date(),
+      amount: { amount: -2_500, currency: 'USD' },
+      description: 'COFFEE',
+      sourceAccountId: 'plaid-acct-AAA',
+    };
+    const fromAcctB: BankTransaction = {
+      externalId: 'plaid-2',
+      postedDate: new Date(),
+      amount: { amount: 10_000, currency: 'USD' },
+      description: 'PAYROLL',
+      sourceAccountId: 'plaid-acct-BBB',
+    };
+    expect(fromAcctA.sourceAccountId).not.toBe(fromAcctB.sourceAccountId);
+    // Statement-format rows are single-account → leave it undefined.
+    const ofxRow: BankTransaction = {
+      externalId: 'ofx-1',
+      postedDate: new Date(),
+      amount: { amount: 100, currency: 'USD' },
+      description: 'd',
+    };
+    expect(ofxRow.sourceAccountId).toBeUndefined();
+  });
+
+  it('pending + supersedesExternalId model the real-time-feed lifecycle', () => {
+    // A provisional pending row (Plaid `pending: true`).
+    const pending: BankTransaction = {
+      externalId: 'plaid-pending-1',
+      postedDate: new Date(),
+      amount: { amount: -2_500, currency: 'USD' },
+      description: 'AMZN MKTP (pending)',
+      pending: true,
+    };
+    // The posted row that later supersedes it (different externalId, back-ref).
+    const posted: BankTransaction = {
+      externalId: 'plaid-posted-9',
+      postedDate: new Date(),
+      amount: { amount: -2_500, currency: 'USD' },
+      description: 'AMZN MKTP',
+      pending: false,
+      supersedesExternalId: 'plaid-pending-1',
+    };
+    expect(pending.pending).toBe(true);
+    // Both omit fine (statement formats never set them).
+    const settled: BankTransaction = {
+      externalId: 'ofx-1',
+      postedDate: new Date(),
+      amount: { amount: 100, currency: 'USD' },
+      description: 'd',
+    };
+    expect(settled.pending).toBeUndefined();
+    expect(settled.supersedesExternalId).toBeUndefined();
+    // The back-pointer links posted → the pending row it replaces.
+    expect(posted.supersedesExternalId).toBe(pending.externalId);
+  });
 });
 
 describe('BankAccount shape', () => {

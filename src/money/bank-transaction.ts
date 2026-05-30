@@ -136,6 +136,44 @@ export interface BankTransaction {
   type?: string;
 
   /**
+   * Vendor-side identifier of the account this row belongs to — Plaid
+   * `account_id`, Xero `BankAccount.AccountID`. Sync feeds return transactions
+   * spanning MULTIPLE accounts in one batch, so this lets a consumer route
+   * each row to the right destination account per-transaction (multi-account
+   * sync) instead of forcing the whole batch onto one account.
+   *
+   * Statement formats (OFX / CAMT.053 / MT940 / CSV / IIF) are single-account
+   * files — they carry the account on `BankStatement.account` and leave this
+   * `undefined`. Distinct from any consumer-side account id (e.g. the host's
+   * own `bankAccountId` used in the import unique index).
+   */
+  sourceAccountId?: string;
+
+  /**
+   * The entry has not yet posted / cleared — the bank may still change its
+   * amount, description, or drop it entirely. Real-time feeds populate this
+   * (Plaid `pending: true`); statement formats (OFX / CAMT.053 / MT940 / CSV)
+   * only ever carry settled rows and leave it `undefined`.
+   *
+   * Consumers MUST treat `pending: true` rows as provisional — do not
+   * reconcile or post them as final, and expect a superseding posted row to
+   * arrive later (linked via `supersedesExternalId`).
+   */
+  pending?: boolean;
+
+  /**
+   * Set on a POSTED row that replaces an earlier PENDING one: the
+   * `externalId` of the pending row this entry supersedes (Plaid
+   * `pending_transaction_id`).
+   *
+   * The pending and posted rows carry DIFFERENT `externalId`s, so dedup on
+   * `externalId` alone can't collapse them — consumers MUST use this
+   * back-pointer to drop / replace the superseded pending row on ingest, or
+   * both versions persist as duplicates.
+   */
+  supersedesExternalId?: string;
+
+  /**
    * Format-specific raw record. Pass-through for audit / debugging.
    * Consumers MUST NOT rely on this — schema may change between fin-io
    * minor versions. Discard before persistence if size is a concern.

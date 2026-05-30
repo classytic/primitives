@@ -3,6 +3,34 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-05-30
+
+### Added — `BankTransaction` per-account routing + pending lifecycle fields
+
+Three additive optional fields on `BankTransaction` (`/bank-transaction`):
+
+- **`sourceAccountId?: string`** — the vendor-side account this row belongs to
+  (Plaid `account_id`, Xero `BankAccount.AccountID`). Sync feeds return
+  transactions spanning multiple accounts in one batch; this lets consumers
+  route each row to the right account per-transaction (multi-account sync)
+  instead of forcing the whole batch onto one account. Statement formats
+  (single-account files) leave it undefined — the account lives on
+  `BankStatement.account`.
+- **`pending?: boolean`** — the entry hasn't posted/cleared yet (real-time
+  feeds like Plaid `pending: true`; statement formats leave it undefined).
+  Consumers must treat pending rows as provisional — don't reconcile/post
+  them as final.
+- **`supersedesExternalId?: string`** — set on a POSTED row that replaces an
+  earlier PENDING one, carrying the pending row's `externalId` (Plaid
+  `pending_transaction_id`). Pending and posted rows have different
+  `externalId`s, so consumers MUST use this back-pointer to drop/replace the
+  superseded pending row on ingest — otherwise both persist as duplicates.
+
+Backward-compatible (both optional). Closes a fidelity gap where Plaid's
+pending state was dropped at the canonical boundary, so downstream consumers
+(`@classytic/fin-io` Plaid mapper, `@classytic/revenue` import) couldn't
+distinguish provisional rows or dedupe pending→posted.
+
 ## [0.7.1] - 2026-05-26
 
 ### Added — workflow + scheduling + composition primitives
