@@ -54,9 +54,7 @@ export interface StatusChangeEntry<TStatus extends string> {
 /**
  * Convenience alias for entity fields: `statusHistory: StatusHistory<LeadStatus>`.
  */
-export type StatusHistory<TStatus extends string> = readonly StatusChangeEntry<
-  TStatus
->[];
+export type StatusHistory<TStatus extends string> = readonly StatusChangeEntry<TStatus>[];
 
 export interface AppendOptions {
   by?: string;
@@ -80,9 +78,7 @@ export function appendStatus<TStatus extends string>(
   const now = options.at ?? new Date();
   const prior = history.length === 0 ? undefined : history[history.length - 1];
   const durationInPriorMs =
-    prior === undefined
-      ? 0
-      : Math.max(0, now.getTime() - prior.occurredAt.getTime());
+    prior === undefined ? 0 : Math.max(0, now.getTime() - prior.occurredAt.getTime());
 
   const entry: StatusChangeEntry<TStatus> = {
     status,
@@ -119,10 +115,7 @@ export function timeInStatus<TStatus extends string>(
   }
   // If the current (last) status is the target, add the still-running interval.
   if (history.length > 0 && history[history.length - 1]!.status === status) {
-    total += Math.max(
-      0,
-      now.getTime() - history[history.length - 1]!.occurredAt.getTime(),
-    );
+    total += Math.max(0, now.getTime() - history[history.length - 1]!.occurredAt.getTime());
   }
   return total;
 }

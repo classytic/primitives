@@ -112,7 +112,10 @@ export function isExpiryTracked(policy: ShelfLifePolicy): boolean {
 /** Validate a policy. Call before storing host-side. */
 export function validateShelfLifePolicy(policy: ShelfLifePolicy): void {
   if (!TRACKING_MODES.includes(policy.mode)) {
-    throw new ShelfLifeError('INVALID_MODE', `mode must be one of ${TRACKING_MODES.join(', ')}, got ${String(policy.mode)}`);
+    throw new ShelfLifeError(
+      'INVALID_MODE',
+      `mode must be one of ${TRACKING_MODES.join(', ')}, got ${String(policy.mode)}`,
+    );
   }
   for (const [key, val] of [
     ['shelfLifeDays', policy.shelfLifeDays],
@@ -122,7 +125,10 @@ export function validateShelfLifePolicy(policy: ShelfLifePolicy): void {
   ] as const) {
     if (val === undefined) continue;
     if (!Number.isFinite(val) || val < 0) {
-      throw new ShelfLifeError('INVALID_DAYS', `${key} must be a non-negative number, got ${String(val)}`);
+      throw new ShelfLifeError(
+        'INVALID_DAYS',
+        `${key} must be a non-negative number, got ${String(val)}`,
+      );
     }
   }
 }
@@ -201,6 +207,9 @@ function addDays(d: Date, days: number): Date {
   return new Date(d.getTime() + days * DAY_MS);
 }
 
-function defined<K extends string, V>(key: K, val: V | undefined): Record<K, V> | Record<string, never> {
+function defined<K extends string, V>(
+  key: K,
+  val: V | undefined,
+): Record<K, V> | Record<string, never> {
   return val === undefined ? {} : ({ [key]: val } as Record<K, V>);
 }

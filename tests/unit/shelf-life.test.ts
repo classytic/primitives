@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type ShelfLifeError,
-  type ShelfLifePolicy,
   deriveShelfLifeDates,
   isExpiryTracked,
   isTracked,
+  type ShelfLifeError,
+  type ShelfLifePolicy,
   shelfLifeStatus,
   validateShelfLifePolicy,
 } from '../../src/scheduling/shelf-life.js';
@@ -117,7 +117,10 @@ describe('deriveShelfLifeDates', () => {
 
   it('clamps an over-long offset to receivedAt (never before receipt)', () => {
     // removalDays (40) exceeds shelf life (30) — removal would land pre-receipt.
-    const dates = deriveShelfLifeDates(received, perishable({ shelfLifeDays: 30, removalDays: 40 }));
+    const dates = deriveShelfLifeDates(
+      received,
+      perishable({ shelfLifeDays: 30, removalDays: 40 }),
+    );
     expect(dates.removalDate?.getTime()).toBe(received.getTime());
   });
 

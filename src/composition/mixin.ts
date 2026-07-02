@@ -83,11 +83,7 @@ export function getMixin<M>(entity: Mixinable, key: string): M | null {
 
 /** Cheap presence check — useful for `if (hasMixin(c, 'customer')) …` branches. */
 export function hasMixin(entity: Mixinable, key: string): boolean {
-  return (
-    entity.mixins !== undefined &&
-    entity.mixins !== null &&
-    entity.mixins[key] !== undefined
-  );
+  return entity.mixins !== undefined && entity.mixins !== null && entity.mixins[key] !== undefined;
 }
 
 /**

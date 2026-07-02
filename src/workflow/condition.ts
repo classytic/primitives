@@ -77,18 +77,13 @@ export interface NotCondition {
   readonly not: Condition;
 }
 
-export type Condition =
-  | FieldCondition
-  | AllCondition
-  | AnyCondition
-  | NotCondition;
+export type Condition = FieldCondition | AllCondition | AnyCondition | NotCondition;
 
 // ─── Type guards (also stable JSON shape detectors) ───────────────────────
 
 function isFieldCondition(c: Condition): c is FieldCondition {
   return (
-    typeof (c as FieldCondition).field === 'string' &&
-    typeof (c as FieldCondition).op === 'string'
+    typeof (c as FieldCondition).field === 'string' && typeof (c as FieldCondition).op === 'string'
   );
 }
 function isAllCondition(c: Condition): c is AllCondition {
@@ -223,9 +218,19 @@ export class ConditionError extends Error {
 }
 
 const COMPARATORS = new Set<Comparator>([
-  'eq', 'neq', 'gt', 'gte', 'lt', 'lte',
-  'in', 'nin', 'contains', 'startsWith', 'endsWith',
-  'isNull', 'isNotNull',
+  'eq',
+  'neq',
+  'gt',
+  'gte',
+  'lt',
+  'lte',
+  'in',
+  'nin',
+  'contains',
+  'startsWith',
+  'endsWith',
+  'isNull',
+  'isNotNull',
 ]);
 const UNARY_OPS = new Set<Comparator>(['isNull', 'isNotNull']);
 
@@ -258,16 +263,10 @@ export function validateCondition(condition: Condition): void {
   }
   if (isFieldCondition(condition)) {
     if (!COMPARATORS.has(condition.op)) {
-      throw new ConditionError(
-        'INVALID_OP',
-        `unknown comparator: ${JSON.stringify(condition.op)}`,
-      );
+      throw new ConditionError('INVALID_OP', `unknown comparator: ${JSON.stringify(condition.op)}`);
     }
     if (!UNARY_OPS.has(condition.op) && condition.value === undefined) {
-      throw new ConditionError(
-        'MISSING_VALUE',
-        `comparator '${condition.op}' requires a value`,
-      );
+      throw new ConditionError('MISSING_VALUE', `comparator '${condition.op}' requires a value`);
     }
     return;
   }

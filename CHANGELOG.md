@@ -3,6 +3,35 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-07-02
+
+### Added — `/timezone`: IANA resolution + civil dates (the door for `/calendar`'s escape hatch)
+
+`/calendar` owns wall-clock ARITHMETIC over a fixed `UtcOffsetMinutes` and
+tells hosts to "resolve the offset for the instant and pass it in" — but the
+stack had no shared resolver, so consumers hand-rolled `Intl.DateTimeFormat`
+(three divergent copies found: catalog ×2, be-prod POS). `/timezone` is that
+resolver — zero-dep (Intl IS the ICU tz database), Temporal-shaped names for
+a future mechanical migration:
+
+- **`zoneOffsetMinutes(instant, zone)`** — per-instant, DST-exact offset;
+  composes directly with `/calendar`: `startOfMonth(i, zoneOffsetMinutes(i, z))`.
+- **`localTimeParts(instant, zone)`** — `{ isoWeekday, hour, minute,
+  minutesOfDay }` in the zone; what pricing windows / slot grids /
+  working-hours checks evaluate against (canonicalizes catalog's resolvers).
+- **`CivilDate`** (branded `'YYYY-MM-DD'`) + `civilDate` / `isCivilDate` /
+  `civilDateOf(instant, zone)` / `civilDateToInstant(cd, zone, time?)`
+  (two-pass DST-safe) / `addCivilDays` / `civilDaysBetween` — the type for
+  hotel nights, POS business dates, VAT filing years. Lexicographic ==
+  chronological, so it's a range-queryable Mongo string key.
+- **`isValidTimeZone(zone)`** — boot-time host-config validation;
+  **`listTimeZones()`** + **`zoneOffsetLabel(instant, zone)`** — the data
+  source + label for Google-Calendar-style zone pickers, straight from ICU
+  (`Intl.supportedValuesOf`), no bundled list to go stale.
+- `TimeZoneError`; formatter instances cached per zone.
+
+No arithmetic here (that stays in `/calendar`) — resolution only.
+
 ## [0.7.2] - 2026-05-30
 
 ### Added — `BankTransaction` per-account routing + pending lifecycle fields

@@ -3,8 +3,8 @@ import {
   formatNational,
   formatPhone,
   isPhoneNumber,
-  parsePhone,
   PhoneError,
+  parsePhone,
 } from '../../src/identity/phone.js';
 
 describe('parsePhone', () => {

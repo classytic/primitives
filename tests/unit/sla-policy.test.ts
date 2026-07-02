@@ -5,8 +5,8 @@ import {
   deriveRollingResponseSLA,
   evaluateSLAStatus,
   isWithinWorkingHours,
-  SLAPolicyError,
   type SLAPolicy,
+  SLAPolicyError,
 } from '../../src/scheduling/sla-policy.js';
 
 const policy: SLAPolicy = defineSLAPolicy({
@@ -78,9 +78,7 @@ describe('deriveFirstResponseSLA / deriveRollingResponseSLA', () => {
   });
 
   it('falls back to defaultPriority for unknown priorities', () => {
-    expect(deriveFirstResponseSLA(policy, 'mythical-key').targetDurationMs).toBe(
-      8 * 3_600_000,
-    );
+    expect(deriveFirstResponseSLA(policy, 'mythical-key').targetDurationMs).toBe(8 * 3_600_000);
   });
 });
 

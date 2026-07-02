@@ -48,6 +48,12 @@ const checks = [
   ['./mixin', 'getMixin'],
   ['./sla-policy', 'defineSLAPolicy'],
   ['./sla-policy', 'evaluateSLAStatus'],
+  // ─── 0.9.0 additions ─────────────────────────────────────────────────
+  ['./calendar', 'startOfDay'],
+  ['./timezone', 'zoneOffsetMinutes'],
+  ['./timezone', 'localTimeParts'],
+  ['./timezone', 'civilDateOf'],
+  ['./timezone', 'listTimeZones'],
 ];
 
 const failures = [];

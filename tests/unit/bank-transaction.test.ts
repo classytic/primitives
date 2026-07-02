@@ -10,7 +10,6 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { Money } from '../../src/money/money.js';
 import type {
   BankAccount,
   BankCounterparty,
@@ -20,6 +19,7 @@ import type {
   BankStatementSource,
   BankTransaction,
 } from '../../src/money/bank-transaction.js';
+import type { Money } from '../../src/money/money.js';
 
 describe('BankTransaction shape', () => {
   it('uses Money (number minor units) — not bigint, not float', () => {
@@ -228,9 +228,7 @@ describe('BankStatement shape', () => {
 
 describe('BankImportReport / BankImportRowError', () => {
   it('inserted + updated + skipped sum to total rows attempted', () => {
-    const errors: BankImportRowError[] = [
-      { externalId: 'BAD_1', reason: 'invalid_amount' },
-    ];
+    const errors: BankImportRowError[] = [{ externalId: 'BAD_1', reason: 'invalid_amount' }];
     const report: BankImportReport = {
       inserted: 8,
       updated: 1,

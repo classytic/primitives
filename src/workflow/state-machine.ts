@@ -136,10 +136,7 @@ export function defineStateMachine<TStatus extends string>(
   // `validSources` is O(1) lookup. Built once at definition time; the
   // `Object.freeze`ed arrays make the result safe to expose by reference.
   const reverse = new Map<TStatus, TStatus[]>();
-  for (const [status, allowed] of Object.entries(transitions) as [
-    TStatus,
-    readonly TStatus[],
-  ][]) {
+  for (const [status, allowed] of Object.entries(transitions) as [TStatus, readonly TStatus[]][]) {
     if (allowed.length === 0) terminal.add(status);
     for (const target of allowed) {
       const sources = reverse.get(target);

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   appendStatus,
-  latestEntry,
   lastTransitionTo,
-  timeInStatus,
+  latestEntry,
   type StatusHistory,
+  timeInStatus,
 } from '../../src/workflow/status-history.js';
 
 type LeadStatus = 'new' | 'qualified' | 'converted' | 'disqualified';

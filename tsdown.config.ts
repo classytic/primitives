@@ -33,6 +33,8 @@ export default defineConfig({
 
     // ─── scheduling ─────────────────────────────────────────────────────
     period: 'src/scheduling/period.ts',
+    calendar: 'src/scheduling/calendar.ts',
+    timezone: 'src/scheduling/timezone.ts',
     cadence: 'src/scheduling/cadence.ts',
     sla: 'src/scheduling/sla.ts',
     'sla-policy': 'src/scheduling/sla-policy.ts',

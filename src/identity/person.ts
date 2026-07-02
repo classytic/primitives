@@ -29,9 +29,7 @@ export function formatDisplayName(name: PersonName): string {
   // is a footgun — `${undefined} ${undefined}`.trim() → "undefined
   // undefined". Filter Boolean(p?.trim()) to keep both "spaces only"
   // and `undefined` parts out of the output.
-  return [name.given, name.family]
-    .filter((p): p is string => Boolean(p?.trim()))
-    .join(' ');
+  return [name.given, name.family].filter((p): p is string => Boolean(p?.trim())).join(' ');
 }
 
 /**

@@ -45,7 +45,7 @@
  */
 
 import type { IsoWeekday } from './cadence.js';
-import { type SLA, isBreached as isSLABreached, remainingMs } from './sla.js';
+import { isBreached as isSLABreached, remainingMs, type SLA } from './sla.js';
 
 // ─── Policy ───────────────────────────────────────────────────────────────
 
@@ -131,10 +131,7 @@ export function defineSLAPolicy(spec: SLAPolicy): SLAPolicy {
       !Number.isFinite(rule.rollingResponseMs) ||
       rule.rollingResponseMs <= 0
     ) {
-      throw new SLAPolicyError(
-        'INVALID_DURATION',
-        `priority '${key}' has non-positive duration`,
-      );
+      throw new SLAPolicyError('INVALID_DURATION', `priority '${key}' has non-positive duration`);
     }
   }
   if (spec.workingHours !== undefined) {
@@ -146,10 +143,7 @@ export function defineSLAPolicy(spec: SLAPolicy): SLAPolicy {
       wh.endMinute > 24 * 60 ||
       wh.weekdays.length === 0
     ) {
-      throw new SLAPolicyError(
-        'INVALID_HOURS',
-        'workingHours bounds are invalid',
-      );
+      throw new SLAPolicyError('INVALID_HOURS', 'workingHours bounds are invalid');
     }
   }
   return spec;
@@ -163,10 +157,7 @@ export function defineSLAPolicy(spec: SLAPolicy): SLAPolicy {
  * once; per-entity it persists `{ slaPolicyId, priority, startedAt }` and
  * derives the SLA on demand.
  */
-export function deriveFirstResponseSLA(
-  policy: SLAPolicy,
-  priority?: PriorityKey,
-): SLA {
+export function deriveFirstResponseSLA(policy: SLAPolicy, priority?: PriorityKey): SLA {
   const rule = priorityRule(policy, priority);
   return {
     targetDurationMs: rule.firstResponseMs,
@@ -175,10 +166,7 @@ export function deriveFirstResponseSLA(
   };
 }
 
-export function deriveRollingResponseSLA(
-  policy: SLAPolicy,
-  priority?: PriorityKey,
-): SLA {
+export function deriveRollingResponseSLA(policy: SLAPolicy, priority?: PriorityKey): SLA {
   const rule = priorityRule(policy, priority);
   return {
     targetDurationMs: rule.rollingResponseMs,
@@ -255,9 +243,7 @@ export function evaluateSLAStatus(
 ): SLAStatus {
   if (inputs.firstRespondedAt === null) {
     const sla = deriveFirstResponseSLA(policy, inputs.priority);
-    const responseBy = new Date(
-      inputs.startedAt.getTime() + sla.targetDurationMs,
-    );
+    const responseBy = new Date(inputs.startedAt.getTime() + sla.targetDurationMs);
     const breached = isSLABreached(sla, inputs.startedAt, now);
     return {
       kind: breached ? 'Failed' : 'FirstResponseDue',
@@ -306,10 +292,7 @@ export function evaluateSLAStatus(
  * before passing in. Bringing a tz lib into `@classytic/primitives` is a
  * dep we don't want.
  */
-export function isWithinWorkingHours(
-  policy: SLAPolicy,
-  instant: Date,
-): boolean {
+export function isWithinWorkingHours(policy: SLAPolicy, instant: Date): boolean {
   if (!policy.workingHours) return true;
   const wh = policy.workingHours;
 

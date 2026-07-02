@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   getMixin,
   hasMixin,
+  type Mixinable,
   withMixin,
   withoutMixin,
-  type Mixinable,
 } from '../../src/composition/mixin.js';
 
 interface Contact extends Mixinable {

@@ -4,13 +4,13 @@
  * hard-code ids — always let the caller specify what matters.
  */
 
-import type { Address, ContactAddress, GeoPoint } from '../../src/identity/address.js';
 import type { OperationContext } from '../../src/composition/context.js';
+import type { ExternalRef } from '../../src/composition/reference.js';
 import type { DomainEvent, EventMeta, EventTransport } from '../../src/events/events.js';
 import { matchEventPattern } from '../../src/events/events.js';
+import type { Address, ContactAddress, GeoPoint } from '../../src/identity/address.js';
 import type { Money } from '../../src/money/money.js';
 import type { DateRange } from '../../src/scheduling/period.js';
-import type { ExternalRef } from '../../src/composition/reference.js';
 
 export function makeMoney(overrides: Partial<Money> = {}): Money {
   return { amount: 1000, currency: 'USD', ...overrides };

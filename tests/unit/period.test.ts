@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isDateRange, isWithin, rangeDurationMs, rangesOverlap } from '../../src/scheduling/period.js';
+import {
+  isDateRange,
+  isWithin,
+  rangeDurationMs,
+  rangesOverlap,
+} from '../../src/scheduling/period.js';
 import { makeDateRange } from '../helpers/fixtures.js';
 
 describe('isDateRange', () => {
