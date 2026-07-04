@@ -73,7 +73,15 @@ export const MINOR_UNIT_FACTOR: Readonly<Record<string, number>> = {
   TND: 1000,
 };
 
-const CURRENCY_PATTERN = /^[A-Z]{3}$/;
+/**
+ * ISO 4217 format — 3 uppercase letters. Exported so consumers can embed
+ * the SAME pattern in JSON-Schema-representable validators (zod `.regex`,
+ * Mongoose `match`, OpenAPI `pattern`) instead of hand-rolling a copy:
+ * `.refine(isCurrencyCode)` validates at runtime but is dropped by
+ * `z.toJSONSchema`, losing the constraint from generated API docs.
+ * `isCurrencyCode` / `toCurrencyCode` remain the runtime API.
+ */
+export const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 
 /**
  * Narrow a raw string to a {@link CurrencyCode}. Returns `null` if the string

@@ -3,6 +3,18 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-07-04
+
+### Added
+
+- **`CURRENCY_PATTERN` exported from `/currency`** — the ISO 4217 regex
+  (`/^[A-Z]{3}$/`) behind `isCurrencyCode` / `toCurrencyCode`. Consumers
+  embed the SAME pattern in JSON-Schema-representable validators (zod
+  `.regex`, Mongoose `match`, OpenAPI `pattern`) instead of hand-rolling
+  copies — `.refine(isCurrencyCode)` validates at runtime but is dropped
+  by `z.toJSONSchema`, silently losing the constraint from generated API
+  docs.
+
 ## [0.9.0] - 2026-07-02
 
 ### Added — `/timezone`: IANA resolution + civil dates (the door for `/calendar`'s escape hatch)
