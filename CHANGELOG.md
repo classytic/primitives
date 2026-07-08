@@ -3,6 +3,25 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-07-08
+
+### Added — eKYC vocabulary + secure OTP primitive
+
+- **`@classytic/primitives/identity-verification`** — cross-package eKYC data shapes:
+  `IdentityDocumentType`, `VerificationCheck`, `VerificationLevel`, `SubjectKind`,
+  `IdentitySubject`, `DocumentReference`, `IdentityProviderCapabilities`,
+  `VerificationStatus`, `CheckResult`, `CreateVerificationParams`,
+  `VerificationSession`, `VerificationWebhookEvent`. Pure helpers: `isVerified`,
+  `checksSatisfy`, `deriveStatus`. The identity twin of `payment-gateway` — shapes
+  here, contracts in engines, provider implementations anywhere. Serves `@classytic/esign`
+  (IdentityBridge port), `@classytic/payee` (ComplianceBridge), and PSP merchant KYC.
+- **`@classytic/primitives/otp`** — secure OTP challenge lifecycle. Guarantees: code
+  never persisted (only HMAC-SHA256 digest stored), constant-time `timingSafeEqual`
+  comparison, rejection-free `randomInt` CSPRNG (no modulo bias), bounded attempt
+  counter, TTL expiry, single-use verified state. Exports: `createOtpChallenge`,
+  `verifyOtpChallenge`, `isOtpVerified`, `isOtpActive`. Delivery stays in
+  `@classytic/notifications` — this primitive owns only the verify half.
+
 ## [0.9.1] - 2026-07-04
 
 ### Added

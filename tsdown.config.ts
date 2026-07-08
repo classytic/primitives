@@ -30,6 +30,8 @@ export default defineConfig({
     person: 'src/identity/person.ts',
     address: 'src/identity/address.ts',
     phone: 'src/identity/phone.ts',
+    'identity-verification': 'src/identity/identity-verification.ts',
+    otp: 'src/identity/otp.ts',
 
     // ─── scheduling ─────────────────────────────────────────────────────
     period: 'src/scheduling/period.ts',
