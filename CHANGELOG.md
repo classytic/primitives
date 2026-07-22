@@ -3,6 +3,45 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-07-22
+
+### Added — `/unit-cost-rate`: exact per-unit monetary rates (bigint-safe)
+
+- **`@classytic/primitives/unit-cost-rate`** — fractional per-unit monetary
+  rates stored as scaled integers (`scaledAmount = minorPerUnit × RATE_SCALE`,
+  `RATE_SCALE = 1_000_000`). Solves the WAC / FIFO valuation problem where
+  dividing a total by a fractional quantity yields a sub-minor-unit rate
+  (100 paisa ÷ 3 units = 33.333… paisa/unit) that must not lose precision.
+  Exports:
+  - `unitCostRate(minorPerUnit, currency)` — direct rate constructor
+  - `unitCostRateFromTotal(totalMinor, quantity, currency)` — WAC/FIFO
+    constructor; bigint-safe, QTY_SCALE grid for fractional quantities
+  - `extendedAmount(rate, qty, mode?)` — the ONE rate→total rounding boundary;
+    bigint multiplication to keep large amounts exact; default `'half-even'`
+    (banker's rounding), `'half-up'` available for legacy parity
+  - `rateMinorPerUnit(rate)` — display helper (fractional number, NOT for math)
+  - `isUnitCostRate(value)` — structural type guard
+  - `UnitCostRate<C>` interface, `UnitCostRateError`, `UnitCostRateErrorCode`,
+    `RoundingMode`, `RATE_SCALE`
+  - For distributing a top-down charge across lines with no lost minor unit,
+    compose with `allocate` from `@classytic/primitives/split-allocation`.
+
+### Changed — `/outbox` is now the canonical contract owner
+
+- **`@classytic/primitives/outbox` owns the transactional-outbox contract.**
+  Previously this file was documented as a mirror of `@classytic/arc`'s copy
+  ("arc is source of truth, keep bit-identical") while arc's docs said the
+  opposite — a manual-sync drift risk. Settled: primitives owns pure
+  cross-package contracts (events + outbox); arc owns runtime behavior
+  (`EventOutbox` relay, stores, backoff, Fastify integration) and, from
+  arc 2.24+, imports + re-exports this contract instead of duplicating it.
+- **Cross-package `instanceof` now works.** Because arc re-exports these exact
+  `OutboxOwnershipError` / `InvalidOutboxEventError` classes, a store built
+  against primitives throws the same class identity arc's relay catches.
+  Under the old duplication, arc's `instanceof` checks silently missed
+  primitives-thrown ownership errors.
+- No export names or signatures changed — contract surface is identical.
+
 ## [0.11.0] - 2026-07-08
 
 ### Added — eKYC vocabulary + secure OTP primitive

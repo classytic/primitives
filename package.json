@@ -1,6 +1,6 @@
 {
   "name": "@classytic/primitives",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "description": "Framework-agnostic TypeScript primitives shared across Classytic packages — Money, events, pagination, tenant config, and other building blocks.",
   "author": "Classytic",
   "license": "MIT",
@@ -28,6 +28,10 @@
     "./currency": {
       "types": "./dist/currency.d.mts",
       "default": "./dist/currency.mjs"
+    },
+    "./unit-cost-rate": {
+      "types": "./dist/unit-cost-rate.d.mts",
+      "default": "./dist/unit-cost-rate.mjs"
     },
     "./address": {
       "types": "./dist/address.d.mts",

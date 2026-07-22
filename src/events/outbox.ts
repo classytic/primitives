@@ -1,29 +1,30 @@
 /**
- * Transactional outbox contract — mirrored from `@classytic/arc` v2.9.
+ * Transactional outbox contract — **this file is the canonical owner**
+ * (0.13.0+). `@classytic/arc` imports and re-exports this contract; it no
+ * longer maintains its own copy.
  *
- * This module defines the **contract** surface only:
+ * Ownership rule (settled 2026-07): primitives owns pure cross-package
+ * CONTRACTS (events + outbox); arc owns RUNTIME behavior — the `EventOutbox`
+ * relay, `MemoryOutboxStore`, `repositoryAsOutboxStore`, `exponentialBackoff`,
+ * and Fastify integration all live in `@classytic/arc/events`.
+ *
+ * This module defines the contract surface only:
  *
  *   - {@link OutboxStore} — persistence interface every store implements
  *   - Option types for `save` / `claimPending` / `acknowledge` / `fail`
  *   - {@link OutboxFailurePolicy} contract for retry / DLQ decisions
  *   - Error classes: {@link OutboxOwnershipError}, {@link InvalidOutboxEventError}
  *
- * The **runtime** — `EventOutbox` relay class, `MemoryOutboxStore` reference
- * impl, `MongoOutboxStore` durable impl, `exponentialBackoff` helper — lives
- * in `@classytic/arc/events` and `@classytic/arc/events/mongo`. Apps install
- * arc once and wire package-provided stores into arc's relay.
- *
  * Why the split:
  *
  *   Domain packages (cart, ledger, invoice, …) declare outbox stores
  *   (`CartOutboxRepository`, etc.) that implement this contract, so hosts
- *   can drop them straight into `new EventOutbox({ store: cartOutbox })`.
- *   Packages MUST NOT peer-dep arc; they peer-dep primitives. Mirroring the
+ *   can drop them straight into arc's `new EventOutbox({ store: cartOutbox })`.
+ *   Packages MUST NOT peer-dep arc; they peer-dep primitives. Owning the
  *   contract here lets packages write `implements OutboxStore` without
- *   pulling arc into their dependency graph.
- *
- * Keep this file bit-identical to arc's `packages/arc/src/events/outbox.ts`
- * for the contract surface. Arc is source of truth. See PACKAGE_RULES §11.
+ *   pulling arc into their dependency graph — and because arc re-exports
+ *   these exact classes, `instanceof OutboxOwnershipError` works across the
+ *   package boundary (arc's relay catches errors thrown by package stores).
  */
 
 import type { DeadLetteredEvent, DomainEvent } from './events.js';

@@ -20,6 +20,7 @@ export default defineConfig({
     // ─── money ──────────────────────────────────────────────────────────
     money: 'src/money/money.ts',
     currency: 'src/money/currency.ts',
+    'unit-cost-rate': 'src/money/unit-cost-rate.ts',
     'split-allocation': 'src/money/split-allocation.ts',
     'bank-transaction': 'src/money/bank-transaction.ts',
     'payment-gateway': 'src/money/payment-gateway.ts',
