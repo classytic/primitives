@@ -197,8 +197,18 @@ export interface EventTransport {
   /**
    * Subscribe to a glob pattern — exact match, `*`, or `resource.*`. Returns
    * an unsubscribe function.
+   *
+   * Optional (0.13.0): publish-only transports — outbox bridge adapters,
+   * host wrappers around a `publish(type, payload, meta)` helper, fire-and-
+   * forget pipes into Kafka/webhooks — are legitimate `EventTransport`s.
+   * Consumers that need in-process delivery MUST guard (`transport.subscribe
+   * ? … : throw/fallback`) the same way they already do for the optional
+   * `publishMany` / `deadLetter` members (see flow's
+   * `ConsignmentService.createSettlementListener` for the reference guard).
+   * Kernels subscribing on their OWN in-process bus (which always implements
+   * `subscribe`) are unaffected.
    */
-  subscribe(pattern: string, handler: EventHandler): Promise<() => void>;
+  subscribe?(pattern: string, handler: EventHandler): Promise<() => void>;
 
   /**
    * Route a permanently-failed event to the transport's dead-letter sink
@@ -293,6 +303,69 @@ export function createChildEvent<T>(
       ...meta,
     },
   };
+}
+
+/**
+ * The context slice {@link createScopedEvent} maps into {@link EventMeta}.
+ *
+ * Structurally satisfied by primitives' `OperationContext` (actorId /
+ * organizationId as IdLike) AND by the commerce `actorRef` dialect used by
+ * cart/promo/crm — so every kernel context threads straight through.
+ */
+export interface EventScopeContext {
+  /** Authenticated principal id (`OperationContext.actorId` shape). */
+  actorId?: string | number | { toString(): string } | undefined;
+  /** Commerce actor-reference dialect (`user:123`, `guest:abc`). Used when `actorId` is absent. */
+  actorRef?: string | undefined;
+  /** Tenant / organization / branch scope — rides `meta.organizationId` (META, never payload). */
+  organizationId?: string | { toString(): string } | undefined;
+  /** Correlation id threaded across the causal chain. */
+  correlationId?: string | undefined;
+}
+
+/**
+ * Map an operation context onto event META — THE standard context→meta
+ * mapping (PACKAGE_RULES §8.3: `organizationId` rides META). Extracted from
+ * 25 drifted per-kernel `events/helpers.ts` copies.
+ *
+ *  - `userId`  ← `String(ctx.actorId)`, falling back to `ctx.actorRef`
+ *  - `organizationId` ← `String(ctx.organizationId)`
+ *  - `correlationId`  ← `ctx.correlationId`
+ *
+ * Absent fields are OMITTED (not set to `undefined`) so the result spreads
+ * cleanly under `exactOptionalPropertyTypes`.
+ */
+export function scopedEventMeta(ctx?: EventScopeContext): Partial<EventMeta> {
+  if (!ctx) return {};
+  const meta: Partial<EventMeta> = {};
+  const actor = ctx.actorId ?? ctx.actorRef;
+  if (actor !== undefined) meta.userId = String(actor);
+  if (ctx.organizationId !== undefined) meta.organizationId = String(ctx.organizationId);
+  if (ctx.correlationId !== undefined) meta.correlationId = ctx.correlationId;
+  return meta;
+}
+
+/**
+ * Build a {@link DomainEvent} scoped to an emitting package and an operation
+ * context — the shared core behind every kernel's `createXEvent` helper.
+ *
+ * ```ts
+ * // purchase/src/events/helpers.ts becomes:
+ * export const createPurchaseEvent = <T>(type, payload, ctx?, meta?) =>
+ *   createScopedEvent('@classytic/purchase', type, payload, ctx, meta);
+ * ```
+ *
+ * Precedence: defaults (id/timestamp) < `source` < context mapping < caller
+ * `meta` — identical to the hand-rolled helpers this replaces.
+ */
+export function createScopedEvent<T>(
+  source: string,
+  type: string,
+  payload: T,
+  ctx?: EventScopeContext,
+  meta?: Partial<EventMeta>,
+): DomainEvent<T> {
+  return createEvent(type, payload, { source, ...scopedEventMeta(ctx), ...meta });
 }
 
 /**

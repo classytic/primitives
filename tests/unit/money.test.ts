@@ -5,8 +5,12 @@ import {
   CurrencyMismatchError,
   compareMoney,
   equalsMoney,
+  formatMinorUnits,
   fromMajor,
   isMoney,
+  majorToMinorUnits,
+  minorUnitsToMajor,
+  percentOfMinor,
   isNegativeMoney,
   isPositiveMoney,
   isZeroMoney,
@@ -211,5 +215,93 @@ describe('isMoney type guard', () => {
     expect(isMoney(undefined)).toBe(false);
     expect(isMoney('USD')).toBe(false);
     expect(isMoney(100)).toBe(false);
+  });
+});
+
+// ── Scalar minor-unit helpers (ledger-compatible dialect) ───────────────────
+//
+// These freeze the @classytic/ledger characterization semantics: raw IEEE
+// Math.round (half-up toward +∞), NO toPrecision noise-cleaning. The paired
+// assertions against fromMajor document the intentional divergence.
+
+describe('majorToMinorUnits — scalar major→minor', () => {
+  it('converts with default 2 decimals', () => {
+    expect(majorToMinorUnits(10.5)).toBe(1050);
+    expect(majorToMinorUnits(0)).toBe(0);
+    expect(majorToMinorUnits(100)).toBe(10000);
+    expect(majorToMinorUnits(0.01)).toBe(1);
+    expect(majorToMinorUnits(99.99)).toBe(9999);
+    expect(majorToMinorUnits(-5.25)).toBe(-525);
+  });
+
+  it('supports 0- and 3-decimal exponents', () => {
+    expect(majorToMinorUnits(1000, 0)).toBe(1000);
+    expect(majorToMinorUnits(1.234, 3)).toBe(1234);
+  });
+
+  it('keeps raw IEEE Math.round semantics (ledger characterization)', () => {
+    // 1.005 * 100 === 100.4999… in IEEE 754 → 100 (fromMajor cleans to 101)
+    expect(majorToMinorUnits(1.005)).toBe(100);
+    expect(fromMajor(1.005, 'USD').amount).toBe(101);
+    // float-trap sum still lands correctly
+    expect(majorToMinorUnits(0.1 + 0.2)).toBe(30);
+    // Math.round is half-up toward +∞ — exact negative halves round UP
+    // (-0.125 is exactly representable; ×100 = -12.5 exactly)
+    expect(majorToMinorUnits(-0.125)).toBe(-12);
+    expect(fromMajor(-0.125, 'USD').amount).toBe(-13);
+  });
+
+  it('throws RangeError beyond the safe-integer range and on non-finite input', () => {
+    expect(() => majorToMinorUnits(90_071_992_547_410)).toThrow('exceeds safe integer');
+    expect(() => majorToMinorUnits(Number.NaN)).toThrow(RangeError);
+    expect(() => majorToMinorUnits(Number.POSITIVE_INFINITY)).toThrow(RangeError);
+  });
+});
+
+describe('minorUnitsToMajor — scalar minor→major', () => {
+  it('divides by the exponent factor', () => {
+    expect(minorUnitsToMajor(1050)).toBe(10.5);
+    expect(minorUnitsToMajor(0)).toBe(0);
+    expect(minorUnitsToMajor(1)).toBe(0.01);
+    expect(minorUnitsToMajor(1000, 0)).toBe(1000);
+  });
+});
+
+describe('percentOfMinor — exact multiply-then-round', () => {
+  it('computes standard percentages', () => {
+    expect(percentOfMinor(10000, 5)).toBe(500);
+    expect(percentOfMinor(10000, 13)).toBe(1300);
+    expect(percentOfMinor(5000, 100)).toBe(5000);
+    expect(percentOfMinor(0, 5)).toBe(0);
+    expect(percentOfMinor(-10000, 10)).toBe(-1000);
+  });
+
+  it('handles fractional rates exactly (no basis-point snapping)', () => {
+    // QST 9.975 % — 20000 × 9.975 / 100 = 1995 exactly; a bps-snapped
+    // variant (998 bps) would yield 1996.
+    expect(percentOfMinor(20000, 9.975)).toBe(1995);
+    expect(percentOfMinor(10000, 9.975)).toBe(998); // 997.5 → half-up
+    expect(percentOfMinor(100, 0.01)).toBe(0);
+    expect(percentOfMinor(100000, 0.01)).toBe(10);
+  });
+
+  it('throws TypeError on non-finite input', () => {
+    expect(() => percentOfMinor(Number.NaN, 5)).toThrow(TypeError);
+    expect(() => percentOfMinor(100, Number.POSITIVE_INFINITY)).toThrow(TypeError);
+  });
+});
+
+describe('formatMinorUnits — plain decimal string', () => {
+  it('formats with default 2 decimals', () => {
+    expect(formatMinorUnits(10550)).toBe('105.50');
+    expect(formatMinorUnits(0)).toBe('0.00');
+    expect(formatMinorUnits(1)).toBe('0.01');
+    expect(formatMinorUnits(-5050)).toBe('-50.50');
+    expect(formatMinorUnits(1234567890)).toBe('12345678.90');
+  });
+
+  it('respects the exponent', () => {
+    expect(formatMinorUnits(1000, 0)).toBe('1000');
+    expect(formatMinorUnits(1234, 3)).toBe('1.234');
   });
 });

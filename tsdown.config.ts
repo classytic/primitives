@@ -52,6 +52,7 @@ export default defineConfig({
 
     // ─── events ─────────────────────────────────────────────────────────
     events: 'src/events/events.ts',
+    'event-infra': 'src/events/event-infra.ts',
     outbox: 'src/events/outbox.ts',
     'payment-events': 'src/events/payment-events.ts',
 

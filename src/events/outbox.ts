@@ -4,9 +4,14 @@
  * longer maintains its own copy.
  *
  * Ownership rule (settled 2026-07): primitives owns pure cross-package
- * CONTRACTS (events + outbox); arc owns RUNTIME behavior — the `EventOutbox`
- * relay, `MemoryOutboxStore`, `repositoryAsOutboxStore`, `exponentialBackoff`,
- * and Fastify integration all live in `@classytic/arc/events`.
+ * CONTRACTS (events + outbox); arc owns the DURABLE runtime — the
+ * `EventOutbox` relay, `MongoOutboxStore`, `repositoryAsOutboxStore`,
+ * `exponentialBackoff`, and Fastify integration all live in
+ * `@classytic/arc/events`. The dependency-free in-process REFERENCE runtime
+ * (default kernel bus + `MemoryOutboxStore` for tests/dev) lives in
+ * `@classytic/primitives/event-infra` — kernels can't dep arc, so the
+ * shared fallback implementation lives here instead of being copy-pasted
+ * per kernel.
  *
  * This module defines the contract surface only:
  *

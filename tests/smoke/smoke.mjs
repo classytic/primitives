@@ -54,6 +54,14 @@ const checks = [
   ['./timezone', 'localTimeParts'],
   ['./timezone', 'civilDateOf'],
   ['./timezone', 'listTimeZones'],
+  // ─── 0.13.0 additions ────────────────────────────────────────────────
+  ['./unit-cost-rate', 'unitCostRateFromTotal'],
+  ['./unit-cost-rate', 'extendedAmount'],
+  ['./events', 'createScopedEvent'],
+  ['./events', 'scopedEventMeta'],
+  ['./event-infra', 'InProcessEventBus'],
+  ['./event-infra', 'createInProcessBus'],
+  ['./event-infra', 'MemoryOutboxStore'],
 ];
 
 const failures = [];

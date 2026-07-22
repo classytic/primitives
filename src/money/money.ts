@@ -193,6 +193,81 @@ export function absMoney(m: Money): Money {
   return m.amount < 0 ? negateMoney(m) : m;
 }
 
+// ── Scalar minor-unit helpers (currency-neutral, exponent-based) ────────────
+//
+// The double-entry ledger family (@classytic/ledger and hosts) works on BARE
+// integer minor-unit numbers with an explicit decimal exponent — not on the
+// structured {@link Money} value. These four helpers are the single authority
+// for that scalar dialect (PACKAGE_RULES §8.2 — one rounding point, one
+// owner). Their rounding is deliberately DIFFERENT from {@link fromMajor}:
+//
+//   - `fromMajor` (Money-struct authority): strips IEEE noise via
+//     `toPrecision(15)` and rounds half-AWAY-FROM-ZERO.
+//   - `majorToMinorUnits` (scalar ledger authority): raw IEEE
+//     `Math.round(major * 10^d)` — half-up toward +∞, no noise cleaning.
+//     `majorToMinorUnits(1.005) === 100` (1.005×100 is 100.4999… in IEEE 754)
+//     where `fromMajor(1.005,'USD').amount === 101`.
+//
+// The scalar family freezes the ledger's long-standing characterization-tested
+// wire behavior; changing its rounding would silently shift posted amounts.
+// New Money-struct code should prefer `fromMajor`/`toMajor`.
+
+/**
+ * Decimal major-unit number → integer minor units by decimal exponent.
+ * Rounding: raw IEEE `Math.round` — half-up toward +∞ (so `-10.5 → -10`),
+ * documented above. Throws when the result leaves the safe-integer range
+ * (also catches `NaN`/`Infinity` inputs).
+ *
+ * @example
+ * majorToMinorUnits(10.5)      // 1050
+ * majorToMinorUnits(1000, 0)   // 1000 (JPY-style)
+ * majorToMinorUnits(1.005)     // 100 — IEEE, see note above
+ */
+export function majorToMinorUnits(major: number, minorUnitDecimals = 2): number {
+  const factor = 10 ** minorUnitDecimals;
+  const minor = Math.round(major * factor);
+  if (!Number.isSafeInteger(minor)) {
+    throw new RangeError(
+      `Amount ${major} exceeds safe integer limit when converted to minor units. ` +
+        `Max safe amount: ${Number.MAX_SAFE_INTEGER / factor}`,
+    );
+  }
+  return minor;
+}
+
+/** Integer minor units → decimal major-unit number by decimal exponent: `1050 → 10.5`. */
+export function minorUnitsToMajor(minor: number, minorUnitDecimals = 2): number {
+  return minor / 10 ** minorUnitDecimals;
+}
+
+/**
+ * Percentage of an integer minor-unit amount → integer minor units.
+ * EXACT multiply-then-round: `Math.round((minor × ratePercent) / 100)` —
+ * one rounding point, half-up toward +∞. Handles genuinely fractional rates
+ * (QST 9.975 %) without precision loss: `percentOfMinor(20000, 9.975) === 1995`.
+ *
+ * Hosts whose domain guarantees at-most-2-decimal rates MAY snap the rate to
+ * integer basis points BEFORE calling (be-prod's `#shared/money` seam does) —
+ * that is host policy layered on top, not part of this primitive.
+ */
+export function percentOfMinor(minor: number, ratePercent: number): number {
+  if (!Number.isFinite(minor) || !Number.isFinite(ratePercent)) {
+    throw new TypeError(
+      `percentOfMinor received non-finite input: minor=${minor}, ratePercent=${ratePercent}`,
+    );
+  }
+  return Math.round((minor * ratePercent) / 100);
+}
+
+/**
+ * Integer minor units → plain decimal string (no currency symbol, no locale):
+ * `formatMinorUnits(10550) → "105.50"`, `formatMinorUnits(1000, 0) → "1000"`.
+ * For localized currency strings use `Intl.NumberFormat` at the display layer.
+ */
+export function formatMinorUnits(minor: number, minorUnitDecimals = 2): string {
+  return minorUnitsToMajor(minor, minorUnitDecimals).toFixed(minorUnitDecimals);
+}
+
 /** Structural type guard. */
 export function isMoney(value: unknown): value is Money {
   return (

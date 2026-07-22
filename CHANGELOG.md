@@ -3,6 +3,84 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-07-23
+
+### Added — `/money`: scalar minor-unit helpers (ledger dialect)
+
+- **`majorToMinorUnits(major, minorUnitDecimals = 2)` /
+  `minorUnitsToMajor(minor, minorUnitDecimals = 2)` /
+  `percentOfMinor(minor, ratePercent)` / `formatMinorUnits(minor,
+  minorUnitDecimals = 2)`** — the currency-neutral, exponent-based scalar
+  dialect used by the double-entry ledger family, extracted from
+  `@classytic/ledger/money` (`fromDecimal`/`toDecimal`/`percentage`/
+  `formatPlain`) so the math has ONE owner (PACKAGE_RULES §8.2).
+  Deliberately different rounding from `fromMajor`: raw IEEE `Math.round`
+  (half-up toward +∞, no `toPrecision` cleaning) — the ledger's
+  characterization-tested wire behavior (`majorToMinorUnits(1.005) === 100`
+  where `fromMajor(1.005,'USD').amount === 101`; `-10.5 → -10`).
+  `percentOfMinor` is the EXACT multiply-then-round form (handles QST
+  9.975 % without bps loss); hosts that snap rates to basis points (be-prod
+  `#shared/money`) layer that policy on top before calling.
+
+### Added — `/event-infra`: shared in-process bus + memory outbox
+
+- **`@classytic/primitives/event-infra`** — the dependency-free reference
+  event RUNTIME every kernel previously copy-pasted (26 drifted
+  `in-process-bus.ts` copies + 15 `outbox-store.ts` copies across
+  `commerce/packages/`, ≈1,600 lines). New subpath (not `/events` or
+  `/outbox`, which stay contract-only per the settled ownership rule; arc
+  keeps the DURABLE runtime — relay, `MongoOutboxStore`, backoff). Exports:
+  - `InProcessEventBus` (+ `createInProcessBus`, `InProcessEventBusOptions`,
+    `ErrorLogger`) — in-process fan-out `EventTransport`, structurally
+    identical to arc's `MemoryEventTransport`. Union of all kernel variants:
+    glob matching via `matchEventPattern`, Set-dedup across patterns,
+    per-handler error isolation with injectable logger (`logger: null` =
+    silent swallow, the cart dialect), `publishMany`, idempotent `close()`.
+    Options: `name` (`'in-process-<kernel>'`), `logLabel` for the error line.
+  - `MemoryOutboxStore` — the test/dev outbox (`save`/`getPending`/
+    `acknowledge`/`purge` + `all()`/`clear()` inspection helpers). Kernels
+    re-export it; production durability stays host-wired.
+  - Kernels keep their public class names as thin subclasses
+    (`class InProcessPosBus extends InProcessEventBus`), so no kernel API
+    changes — the bus swap is internal.
+
+### Added — `/events`: standard context→meta mapping
+
+- **`scopedEventMeta(ctx)` + `createScopedEvent(source, type, payload, ctx?,
+  meta?)` + `EventScopeContext`** — THE context→meta mapping (PACKAGE_RULES
+  §8.3: `organizationId` rides META) extracted from 25 drifted per-kernel
+  `events/helpers.ts` copies. `userId` ← `String(actorId)` falling back to
+  `actorRef` (the commerce dialect), `organizationId` ← stringified,
+  `correlationId` pass-through; absent fields omitted
+  (`exactOptionalPropertyTypes`-safe). Kernel helpers become one-liners:
+  `createPurchaseEvent = (t, p, ctx?, m?) =>
+  createScopedEvent('@classytic/purchase', t, p, ctx, m)`.
+
+### Changed — `EventTransport.subscribe` is now optional
+
+- **`/events` `EventTransport.subscribe?`** — publish-only transports (outbox
+  bridge adapters, host wrappers around a `publish(type, payload, meta)`
+  helper, fire-and-forget pipes) now conform without casting. Hosts were
+  writing `subscribe: undefined as unknown as EventTransport['subscribe']`
+  literals or `as unknown as EventTransport` widenings to inject them into
+  kernels that never call `subscribe` on the injected transport. Consumers
+  that need in-process delivery must guard for an absent `subscribe` — the
+  same "detect and fall back" contract `publishMany` and `deadLetter`
+  already carry (flow's `createSettlementListener` is the reference guard;
+  it has guarded `?.subscribe` since flow 0.5). Kernels subscribing on
+  their OWN in-process bus are unaffected — concrete buses still implement
+  `subscribe`, and a concrete method satisfies an optional member.
+- Audited call sites before the change (`commerce/packages/*/src`,
+  `commerce/spine/packages/*/src`): the `.subscribe` uses on injected
+  transports are pass-through dispatcher methods hosts opt into (crm/party
+  `dispatch.ts`), an already-guarded listener (flow's
+  `createSettlementListener`), and invoice's audit bridge — which only
+  subscribes when `config.audit` is wired. Each of these sources picks up a
+  compile-time "possibly undefined" prompt on its NEXT rebuild against this
+  version, forcing the guard (or a documented throw) exactly where a
+  publish-only transport would have failed at runtime before. No published
+  dist behavior changes.
+
 ## [0.13.0] - 2026-07-22
 
 ### Added — `/unit-cost-rate`: exact per-unit monetary rates (bigint-safe)
