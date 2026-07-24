@@ -56,6 +56,9 @@ export default defineConfig({
     outbox: 'src/events/outbox.ts',
     'payment-events': 'src/events/payment-events.ts',
 
+    // ─── retention ──────────────────────────────────────────────────────
+    retention: 'src/retention/purge-evidence.ts',
+
     // ─── composition ────────────────────────────────────────────────────
     mixin: 'src/composition/mixin.ts',
     reference: 'src/composition/reference.ts',

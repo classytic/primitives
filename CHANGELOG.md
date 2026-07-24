@@ -3,7 +3,69 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.14.0] - 2026-07-23
+## [0.16.0] - 2026-07-24
+
+### Added — `/retention`: `PurgeEvidence` value object
+
+- **New `@classytic/primitives/retention` subpath** exporting **`PurgeEvidence`**
+  — the persisted evidence record for a GDPR / data-retention purge operation
+  (proof of what was purged, over what scope, by whom, why, and whether
+  analytical measures were retained). Shape: `{ id, subject: { ref, model? },
+  scope, strategy: 'hard'|'soft'|'anonymize', measuresRetained, processed,
+  occurredAt, actor: { ref, kind: 'user'|'system'|'service' }, reason,
+  legalBasis? }`. The `strategy` enum is a SUBSET of repo-core's
+  `TenantPurgeStrategy['type']` (no `skip` — a skipped purge produces no
+  evidence; no `custom`).
+- **`createPurgeEvidence(input)`** — pure builder; auto-fills `id`
+  (`crypto.randomUUID` with an RFC-4122 v4 fallback) and `occurredAt` only when
+  absent, invoked at call time (never at module load), mirroring `createEvent`.
+- **`isPurgeEvidence(value)`** type guard + **`assertPurgeEvidence(value)`**
+  throwing assertion — structural validation following the package's
+  zero-dependency convention (`isExternalRef`, `isBankTransaction`, ...). Note:
+  primitives ships no runtime schema library (no Zod); hosts derive a schema at
+  their edge from the exported `PurgeEvidence` type.
+- **Cleanup-design §6.1 hardening.** `PurgeEvidence` now also carries a required
+  **`status: 'completed' | 'partial' | 'failed'`** (builder defaults `completed`),
+  optional **`operationId`** (correlate many evidence rows to one run), optional
+  distinguished **`startedAt` / `completedAt`** (alongside the canonical
+  `occurredAt`), optional per-resource **`results: PurgeResourceResult[]`**
+  (`{ resource, processed, ok, error? }`), and optional **`verification:
+  PurgeVerificationSummary`** (`{ ok, checks?, note? }`) — so a multi-step
+  cleanup's evidence records exactly how far it got and what it verified.
+- **Guard tightened** (`isPurgeEvidence`): required labels (`scope`, `reason`,
+  `subject.ref`, `actor.ref`, plus `operationId`/`legalBasis`/`model` when
+  present) must be NON-EMPTY; `processed` (and per-resource `processed`,
+  `verification.checks`) must be INTEGERS; the new `status` enum, `results`
+  array, `verification` object, and `startedAt`/`completedAt` dates are
+  validated. Closes the guard-vs-Zod divergence (the guard previously accepted
+  empty strings and fractional counts the validation schema rejected).
+- **Legal-hold doc fix:** a legal hold PREVENTS a purge (it is not a purge
+  trigger), so it never produces evidence — corrected the header comment.
+- Unit tests (`tests/unit/purge-evidence.test.ts`, 19) + smoke-test coverage
+  for the `./retention` subpath. Cross-package guard↔Zod agreement fixtures live
+  in `@classytic/validation`'s `retention.test.ts`.
+
+Strictly additive to existing records EXCEPT the new required `status` (builder
+defaults it, so `createPurgeEvidence` callers are unaffected; only hand-built
+records must add it).
+
+## [0.15.0] - 2026-07-24
+
+### Added — `/event-infra`: `propagateHandlerErrors` option (strict projection lanes)
+
+- **`InProcessEventBusOptions.propagateHandlerErrors?: boolean`** (default
+  `false` — existing error-isolating behavior unchanged). When `true`,
+  `publish` runs handlers sequentially in subscription order and RETHROWS
+  the first handler error to the publisher instead of catch-log-continue.
+  For SINGLE-CONSUMER projection/relay lanes (outbox relay → one projector):
+  a thrown handler error must fail the delivery so the relay retries /
+  backs off / dead-letters, rather than silently acking unprocessed work.
+  Later matching subscribers are skipped on failure (documented — do not
+  use on shared multi-subscriber operational buses). Nothing is logged on
+  the strict path; `publishMany` keeps its contract and maps each event's
+  failure into its `PublishManyResult` entry instead of rejecting the
+  batch. Strictly additive — default construction is byte-identical to
+  0.14.0 behavior.
 
 ### Added — `/money`: scalar minor-unit helpers (ledger dialect)
 
