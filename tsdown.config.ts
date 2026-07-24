@@ -34,6 +34,9 @@ export default defineConfig({
     'identity-verification': 'src/identity/identity-verification.ts',
     otp: 'src/identity/otp.ts',
 
+    // ─── serialization ──────────────────────────────────────────────────
+    canonical: 'src/serialization/canonical.ts',
+
     // ─── scheduling ─────────────────────────────────────────────────────
     period: 'src/scheduling/period.ts',
     calendar: 'src/scheduling/calendar.ts',

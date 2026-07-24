@@ -48,6 +48,11 @@ const checks = [
   ['./mixin', 'getMixin'],
   ['./sla-policy', 'defineSLAPolicy'],
   ['./sla-policy', 'evaluateSLAStatus'],
+  ['./retention', 'createPurgeEvidence'],
+  ['./retention', 'isPurgeEvidence'],
+  ['./canonical', 'canonicalJson'],
+  ['./canonical', 'sha256Hex'],
+  ['./canonical', 'canonicalDigest'],
   // ─── 0.9.0 additions ─────────────────────────────────────────────────
   ['./calendar', 'startOfDay'],
   ['./timezone', 'zoneOffsetMinutes'],

@@ -3,6 +3,26 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-07-24
+
+### Added — `/canonical`: strict deterministic JSON + integrity digest
+
+- **New `@classytic/primitives/canonical` subpath** — cross-domain vocabulary
+  for STABLE checksums of structured data. `canonicalJson(value)` produces a
+  deterministic string: keys sorted recursively (order-invariant), `Date`
+  serialized explicitly as `{"$date":"<iso>"}` (so timestamps participate in
+  the digest instead of collapsing to `{}` under a naive `JSON.stringify`), and
+  STRICT rejection of ambiguous/non-portable values — `undefined`, `NaN`/
+  `Infinity`, `BigInt`, `function`, `symbol`, `Map`, `Set`, cyclic refs, invalid
+  `Date` — with a `CanonicalizeError`. Plus `sha256Hex(input)` and
+  `canonicalDigest(value)` (= `sha256Hex(canonicalJson(value))`).
+- These are integrity CHECKSUMS (corruption + drift detection), not tamper-proof
+  seals. Uses `node:crypto` directly — precedent: `/otp` already does; the
+  zero-dependency policy covers third-party deps, not Node built-ins.
+- Consolidates a canonicalizer that had appeared in `@classytic/arc/cleanup`;
+  now two domains (cleanup manifests, financial-close evidence manifests) share
+  one implementation. Strictly additive — a brand-new subpath.
+
 ## [0.16.0] - 2026-07-24
 
 ### Added — `/retention`: `PurgeEvidence` value object

@@ -1,6 +1,6 @@
 {
   "name": "@classytic/primitives",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Framework-agnostic TypeScript primitives shared across Classytic packages — Money, events, pagination, tenant config, and other building blocks.",
   "author": "Classytic",
   "license": "MIT",
@@ -160,6 +160,10 @@
     "./retention": {
       "types": "./dist/retention.d.mts",
       "default": "./dist/retention.mjs"
+    },
+    "./canonical": {
+      "types": "./dist/canonical.d.mts",
+      "default": "./dist/canonical.mjs"
     },
     "./package.json": "./package.json"
   },
