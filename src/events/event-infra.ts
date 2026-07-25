@@ -59,6 +59,37 @@ export interface InProcessEventBusOptions {
    * `[<logLabel>] handler error for <event.type>:`. Default: `name`.
    */
   logLabel?: string;
+
+  /**
+   * Rethrow handler errors from `publish` instead of isolating them
+   * (default: `false` — the historical catch-log-continue behavior).
+   *
+   * **When to use (`true`)** — single-consumer projection/relay lanes: the
+   * bus sits between an outbox relay (arc's `EventOutbox` or equivalent) and
+   * exactly ONE subscriber (a projector, read-model builder, or forwarder).
+   * There, a thrown handler error MUST propagate to the publisher so the
+   * delivery FAILS — the relay then retries with backoff / dead-letters the
+   * event instead of silently acknowledging work that was never processed.
+   * With the default isolation, the relay sees `publish` resolve, acks the
+   * outbox row, and the projection update is lost forever.
+   *
+   * **When NOT to use (leave `false`)** — shared operational buses with
+   * multiple independent subscribers (the normal kernel default bus). One
+   * misbehaving subscriber must never crash its siblings or the publishing
+   * code path; failures are logged via {@link logger} and the event is
+   * considered delivered.
+   *
+   * Strict-mode semantics: handlers run sequentially in subscription order
+   * and `publish` rethrows IMMEDIATELY on the first handler failure — later
+   * matching subscribers are SKIPPED for that event. That is the honest
+   * contract for a single-consumer lane; if you attach multiple subscribers
+   * to a strict bus, understand that a failure in an earlier one starves the
+   * later ones. Nothing is logged on the strict path (the propagated error
+   * is the publisher's to handle); `publishMany` maps each event's failure
+   * into its `PublishManyResult` entry (keyed by `meta.id`) instead of
+   * rejecting the batch.
+   */
+  propagateHandlerErrors?: boolean | undefined;
 }
 
 /**
@@ -72,6 +103,8 @@ export interface InProcessEventBusOptions {
  *    event (Set-dedup — the majority variant across kernels).
  *  - Per-handler error isolation: one failing subscriber never crashes
  *    siblings; the failure is logged (or swallowed with `logger: null`).
+ *    Opt out per-bus with `propagateHandlerErrors: true` (single-consumer
+ *    projection/relay lanes — see {@link InProcessEventBusOptions.propagateHandlerErrors}).
  *  - `publishMany` batches per-event outcomes keyed by `meta.id`.
  *  - `close()` clears all subscriptions; publish after close is a no-op;
  *    close is idempotent. NOT durable — engines own it under the fleet
@@ -82,11 +115,13 @@ export class InProcessEventBus implements EventTransport {
   private handlers = new Map<string, Set<EventHandler>>();
   private readonly logger: ErrorLogger | null;
   private readonly logLabel: string;
+  private readonly propagateHandlerErrors: boolean;
 
   constructor(options: InProcessEventBusOptions = {}) {
     this.name = options.name ?? 'in-process';
     this.logger = options.logger === null ? null : (options.logger ?? console);
     this.logLabel = options.logLabel ?? this.name;
+    this.propagateHandlerErrors = options.propagateHandlerErrors ?? false;
   }
 
   async publish(event: DomainEvent): Promise<void> {
@@ -97,6 +132,13 @@ export class InProcessEventBus implements EventTransport {
       }
     }
     for (const handler of matched) {
+      if (this.propagateHandlerErrors) {
+        // Strict (projection/relay) lane: rethrow on first failure so the
+        // publisher (outbox relay) fails the delivery → retry/DLQ instead
+        // of acking unprocessed work. Later subscribers are skipped.
+        await handler(event);
+        continue;
+      }
       try {
         await handler(event);
       } catch (err) {

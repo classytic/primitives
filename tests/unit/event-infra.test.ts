@@ -89,6 +89,99 @@ describe('InProcessEventBus', () => {
     expect(result.get(b.meta.id)).toBeNull();
   });
 
+  describe('propagateHandlerErrors (0.15.0 — projection/relay lanes)', () => {
+    it('default (omitted) still isolates: failing handler is logged, sibling runs, publish resolves', async () => {
+      const logger = { error: vi.fn() };
+      const bus = new InProcessEventBus({ logger });
+      const survivor = vi.fn();
+      await bus.subscribe('proj.*', () => {
+        throw new Error('boom');
+      });
+      await bus.subscribe('proj.*', survivor);
+
+      await expect(bus.publish(createEvent('proj.updated', {}))).resolves.toBeUndefined();
+      expect(survivor).toHaveBeenCalledTimes(1);
+      expect(logger.error).toHaveBeenCalledTimes(1);
+    });
+
+    it('explicit false behaves identically to omitted', async () => {
+      const logger = { error: vi.fn() };
+      const bus = new InProcessEventBus({ propagateHandlerErrors: false, logger });
+      await bus.subscribe('*', () => {
+        throw new Error('boom');
+      });
+      await expect(bus.publish(createEvent('x', {}))).resolves.toBeUndefined();
+      expect(logger.error).toHaveBeenCalledTimes(1);
+    });
+
+    it('strict mode rethrows the handler error to the publisher, does not log, and skips later subscribers', async () => {
+      const logger = { error: vi.fn() };
+      const bus = new InProcessEventBus({ propagateHandlerErrors: true, logger });
+      const skipped = vi.fn();
+      const failure = new Error('projection failed');
+      await bus.subscribe('proj.*', () => {
+        throw failure;
+      });
+      await bus.subscribe('proj.*', skipped);
+
+      await expect(bus.publish(createEvent('proj.updated', {}))).rejects.toBe(failure);
+      expect(skipped).not.toHaveBeenCalled(); // sequential-rethrow: later subscribers starve
+      expect(logger.error).not.toHaveBeenCalled(); // error is the publisher's to handle
+    });
+
+    it('strict mode via createInProcessBus rethrows async rejections too', async () => {
+      const bus = createInProcessBus({ propagateHandlerErrors: true });
+      await bus.subscribe('*', async () => {
+        throw new Error('async boom');
+      });
+      await expect(bus.publish(createEvent('x', {}))).rejects.toThrow('async boom');
+    });
+
+    it('strict mode with no failure delivers to all subscribers normally', async () => {
+      const bus = new InProcessEventBus({ propagateHandlerErrors: true });
+      const a = vi.fn();
+      const b = vi.fn();
+      await bus.subscribe('ok.*', a);
+      await bus.subscribe('*', b);
+      await expect(bus.publish(createEvent('ok.done', {}))).resolves.toBeUndefined();
+      expect(a).toHaveBeenCalledTimes(1);
+      expect(b).toHaveBeenCalledTimes(1);
+    });
+
+    it('strict mode publishMany maps per-event failures into the result (batch does not reject)', async () => {
+      const bus = new InProcessEventBus({ propagateHandlerErrors: true });
+      await bus.subscribe('bad', () => {
+        throw new Error('boom');
+      });
+      const good = createEvent('good', {});
+      const bad = createEvent('bad', {});
+      const result = await bus.publishMany([good, bad]);
+      expect(result.get(good.meta.id)).toBeNull();
+      expect(result.get(bad.meta.id)).toBeInstanceOf(Error);
+      expect((result.get(bad.meta.id) as Error).message).toBe('boom');
+    });
+
+    it('strict mode leaves unsubscribe and close semantics unchanged', async () => {
+      const bus = new InProcessEventBus({ propagateHandlerErrors: true });
+      const kept = vi.fn();
+      const removed = vi.fn(() => {
+        throw new Error('would have propagated');
+      });
+      const unsub = await bus.subscribe('t', removed);
+      await bus.subscribe('t', kept);
+
+      unsub();
+      await expect(bus.publish(createEvent('t', {}))).resolves.toBeUndefined();
+      expect(removed).not.toHaveBeenCalled();
+      expect(kept).toHaveBeenCalledTimes(1);
+
+      await bus.close();
+      await bus.publish(createEvent('t', {}));
+      expect(kept).toHaveBeenCalledTimes(1); // publish after close is a no-op
+      await expect(bus.close()).resolves.toBeUndefined(); // idempotent
+    });
+  });
+
   it('unsubscribe removes only that handler; close clears everything and is idempotent', async () => {
     const bus = new InProcessEventBus();
     const kept = vi.fn();

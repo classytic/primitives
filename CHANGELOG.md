@@ -3,27 +3,7 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.17.0] - 2026-07-24
-
-### Added — `/canonical`: strict deterministic JSON + integrity digest
-
-- **New `@classytic/primitives/canonical` subpath** — cross-domain vocabulary
-  for STABLE checksums of structured data. `canonicalJson(value)` produces a
-  deterministic string: keys sorted recursively (order-invariant), `Date`
-  serialized explicitly as `{"$date":"<iso>"}` (so timestamps participate in
-  the digest instead of collapsing to `{}` under a naive `JSON.stringify`), and
-  STRICT rejection of ambiguous/non-portable values — `undefined`, `NaN`/
-  `Infinity`, `BigInt`, `function`, `symbol`, `Map`, `Set`, cyclic refs, invalid
-  `Date` — with a `CanonicalizeError`. Plus `sha256Hex(input)` and
-  `canonicalDigest(value)` (= `sha256Hex(canonicalJson(value))`).
-- These are integrity CHECKSUMS (corruption + drift detection), not tamper-proof
-  seals. Uses `node:crypto` directly — precedent: `/otp` already does; the
-  zero-dependency policy covers third-party deps, not Node built-ins.
-- Consolidates a canonicalizer that had appeared in `@classytic/arc/cleanup`;
-  now two domains (cleanup manifests, financial-close evidence manifests) share
-  one implementation. Strictly additive — a brand-new subpath.
-
-## [0.16.0] - 2026-07-24
+## [0.15.0] - 2026-07-25
 
 ### Added — `/retention`: `PurgeEvidence` value object
 
@@ -33,135 +13,30 @@ adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   analytical measures were retained). Shape: `{ id, subject: { ref, model? },
   scope, strategy: 'hard'|'soft'|'anonymize', measuresRetained, processed,
   occurredAt, actor: { ref, kind: 'user'|'system'|'service' }, reason,
-  legalBasis? }`. The `strategy` enum is a SUBSET of repo-core's
-  `TenantPurgeStrategy['type']` (no `skip` — a skipped purge produces no
-  evidence; no `custom`).
-- **`createPurgeEvidence(input)`** — pure builder; auto-fills `id`
-  (`crypto.randomUUID` with an RFC-4122 v4 fallback) and `occurredAt` only when
-  absent, invoked at call time (never at module load), mirroring `createEvent`.
-- **`isPurgeEvidence(value)`** type guard + **`assertPurgeEvidence(value)`**
-  throwing assertion — structural validation following the package's
-  zero-dependency convention (`isExternalRef`, `isBankTransaction`, ...). Note:
-  primitives ships no runtime schema library (no Zod); hosts derive a schema at
-  their edge from the exported `PurgeEvidence` type.
-- **Cleanup-design §6.1 hardening.** `PurgeEvidence` now also carries a required
-  **`status: 'completed' | 'partial' | 'failed'`** (builder defaults `completed`),
-  optional **`operationId`** (correlate many evidence rows to one run), optional
-  distinguished **`startedAt` / `completedAt`** (alongside the canonical
-  `occurredAt`), optional per-resource **`results: PurgeResourceResult[]`**
-  (`{ resource, processed, ok, error? }`), and optional **`verification:
-  PurgeVerificationSummary`** (`{ ok, checks?, note? }`) — so a multi-step
-  cleanup's evidence records exactly how far it got and what it verified.
-- **Guard tightened** (`isPurgeEvidence`): required labels (`scope`, `reason`,
-  `subject.ref`, `actor.ref`, plus `operationId`/`legalBasis`/`model` when
-  present) must be NON-EMPTY; `processed` (and per-resource `processed`,
-  `verification.checks`) must be INTEGERS; the new `status` enum, `results`
-  array, `verification` object, and `startedAt`/`completedAt` dates are
-  validated. Closes the guard-vs-Zod divergence (the guard previously accepted
-  empty strings and fractional counts the validation schema rejected).
-- **Legal-hold doc fix:** a legal hold PREVENTS a purge (it is not a purge
-  trigger), so it never produces evidence — corrected the header comment.
-- Unit tests (`tests/unit/purge-evidence.test.ts`, 19) + smoke-test coverage
-  for the `./retention` subpath. Cross-package guard↔Zod agreement fixtures live
-  in `@classytic/validation`'s `retention.test.ts`.
+  legalBasis?, status: 'completed'|'partial'|'failed', operationId?,
+  startedAt?, completedAt?, results?: PurgeResourceResult[],
+  verification?: PurgeVerificationSummary }`.
+- **`createPurgeEvidence(input)`** — pure builder (auto-fills `id` + `occurredAt`
+  when absent, defaults `status` to `'completed'`). **`isPurgeEvidence(value)`**
+  type guard + **`assertPurgeEvidence(value)`** throwing assertion.
 
-Strictly additive to existing records EXCEPT the new required `status` (builder
-defaults it, so `createPurgeEvidence` callers are unaffected; only hand-built
-records must add it).
+### Added — `/canonical`: strict deterministic JSON + integrity digest
 
-## [0.15.0] - 2026-07-24
+- **New `@classytic/primitives/canonical` subpath** — `canonicalJson(value)`
+  produces a deterministic string (keys sorted recursively, `Date` → `{"$date":"<iso>"}`,
+  strict rejection of `undefined`/`NaN`/`BigInt`/`Map`/`Set`/cycles with
+  `CanonicalizeError`). **`sha256Hex(input)`** and **`canonicalDigest(value)`**
+  (= `sha256Hex(canonicalJson(value))`) — integrity checksums, not tamper-proof
+  seals. Uses `node:crypto` directly (same precedent as `/otp`).
 
-### Added — `/event-infra`: `propagateHandlerErrors` option (strict projection lanes)
+### Added — `/event-infra`: `propagateHandlerErrors` option
 
 - **`InProcessEventBusOptions.propagateHandlerErrors?: boolean`** (default
-  `false` — existing error-isolating behavior unchanged). When `true`,
-  `publish` runs handlers sequentially in subscription order and RETHROWS
-  the first handler error to the publisher instead of catch-log-continue.
-  For SINGLE-CONSUMER projection/relay lanes (outbox relay → one projector):
-  a thrown handler error must fail the delivery so the relay retries /
-  backs off / dead-letters, rather than silently acking unprocessed work.
-  Later matching subscribers are skipped on failure (documented — do not
-  use on shared multi-subscriber operational buses). Nothing is logged on
-  the strict path; `publishMany` keeps its contract and maps each event's
-  failure into its `PublishManyResult` entry instead of rejecting the
-  batch. Strictly additive — default construction is byte-identical to
-  0.14.0 behavior.
-
-### Added — `/money`: scalar minor-unit helpers (ledger dialect)
-
-- **`majorToMinorUnits(major, minorUnitDecimals = 2)` /
-  `minorUnitsToMajor(minor, minorUnitDecimals = 2)` /
-  `percentOfMinor(minor, ratePercent)` / `formatMinorUnits(minor,
-  minorUnitDecimals = 2)`** — the currency-neutral, exponent-based scalar
-  dialect used by the double-entry ledger family, extracted from
-  `@classytic/ledger/money` (`fromDecimal`/`toDecimal`/`percentage`/
-  `formatPlain`) so the math has ONE owner (PACKAGE_RULES §8.2).
-  Deliberately different rounding from `fromMajor`: raw IEEE `Math.round`
-  (half-up toward +∞, no `toPrecision` cleaning) — the ledger's
-  characterization-tested wire behavior (`majorToMinorUnits(1.005) === 100`
-  where `fromMajor(1.005,'USD').amount === 101`; `-10.5 → -10`).
-  `percentOfMinor` is the EXACT multiply-then-round form (handles QST
-  9.975 % without bps loss); hosts that snap rates to basis points (be-prod
-  `#shared/money`) layer that policy on top before calling.
-
-### Added — `/event-infra`: shared in-process bus + memory outbox
-
-- **`@classytic/primitives/event-infra`** — the dependency-free reference
-  event RUNTIME every kernel previously copy-pasted (26 drifted
-  `in-process-bus.ts` copies + 15 `outbox-store.ts` copies across
-  `commerce/packages/`, ≈1,600 lines). New subpath (not `/events` or
-  `/outbox`, which stay contract-only per the settled ownership rule; arc
-  keeps the DURABLE runtime — relay, `MongoOutboxStore`, backoff). Exports:
-  - `InProcessEventBus` (+ `createInProcessBus`, `InProcessEventBusOptions`,
-    `ErrorLogger`) — in-process fan-out `EventTransport`, structurally
-    identical to arc's `MemoryEventTransport`. Union of all kernel variants:
-    glob matching via `matchEventPattern`, Set-dedup across patterns,
-    per-handler error isolation with injectable logger (`logger: null` =
-    silent swallow, the cart dialect), `publishMany`, idempotent `close()`.
-    Options: `name` (`'in-process-<kernel>'`), `logLabel` for the error line.
-  - `MemoryOutboxStore` — the test/dev outbox (`save`/`getPending`/
-    `acknowledge`/`purge` + `all()`/`clear()` inspection helpers). Kernels
-    re-export it; production durability stays host-wired.
-  - Kernels keep their public class names as thin subclasses
-    (`class InProcessPosBus extends InProcessEventBus`), so no kernel API
-    changes — the bus swap is internal.
-
-### Added — `/events`: standard context→meta mapping
-
-- **`scopedEventMeta(ctx)` + `createScopedEvent(source, type, payload, ctx?,
-  meta?)` + `EventScopeContext`** — THE context→meta mapping (PACKAGE_RULES
-  §8.3: `organizationId` rides META) extracted from 25 drifted per-kernel
-  `events/helpers.ts` copies. `userId` ← `String(actorId)` falling back to
-  `actorRef` (the commerce dialect), `organizationId` ← stringified,
-  `correlationId` pass-through; absent fields omitted
-  (`exactOptionalPropertyTypes`-safe). Kernel helpers become one-liners:
-  `createPurchaseEvent = (t, p, ctx?, m?) =>
-  createScopedEvent('@classytic/purchase', t, p, ctx, m)`.
-
-### Changed — `EventTransport.subscribe` is now optional
-
-- **`/events` `EventTransport.subscribe?`** — publish-only transports (outbox
-  bridge adapters, host wrappers around a `publish(type, payload, meta)`
-  helper, fire-and-forget pipes) now conform without casting. Hosts were
-  writing `subscribe: undefined as unknown as EventTransport['subscribe']`
-  literals or `as unknown as EventTransport` widenings to inject them into
-  kernels that never call `subscribe` on the injected transport. Consumers
-  that need in-process delivery must guard for an absent `subscribe` — the
-  same "detect and fall back" contract `publishMany` and `deadLetter`
-  already carry (flow's `createSettlementListener` is the reference guard;
-  it has guarded `?.subscribe` since flow 0.5). Kernels subscribing on
-  their OWN in-process bus are unaffected — concrete buses still implement
-  `subscribe`, and a concrete method satisfies an optional member.
-- Audited call sites before the change (`commerce/packages/*/src`,
-  `commerce/spine/packages/*/src`): the `.subscribe` uses on injected
-  transports are pass-through dispatcher methods hosts opt into (crm/party
-  `dispatch.ts`), an already-guarded listener (flow's
-  `createSettlementListener`), and invoice's audit bridge — which only
-  subscribes when `config.audit` is wired. Each of these sources picks up a
-  compile-time "possibly undefined" prompt on its NEXT rebuild against this
-  version, forcing the guard (or a documented throw) exactly where a
-  publish-only transport would have failed at runtime before. No published
-  dist behavior changes.
+  `false` — existing error-isolating behavior unchanged). When `true`, `publish`
+  runs handlers sequentially and rethrows the first handler error to the
+  publisher — for single-consumer projection/relay lanes where a failed handler
+  must not be silently acked. `publishMany` maps each event's failure into its
+  `PublishManyResult` entry instead of rejecting the batch.
 
 ## [0.13.0] - 2026-07-22
 

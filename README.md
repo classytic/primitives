@@ -1,5 +1,7 @@
 # @classytic/primitives
 
+[![Sponsor](https://img.shields.io/github/sponsors/classytic?style=flat-square&label=Sponsor&logo=GitHub&color=EA4AAA)](https://github.com/sponsors/classytic)
+
 Framework-agnostic TypeScript primitives shared across Classytic packages.
 Zero runtime dependencies. ESM only. Node 22+.
 
