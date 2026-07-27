@@ -3,6 +3,22 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-07-27
+
+### Added — `assertApproved` + `CHAIN_INCOMPLETE` (`/approval`)
+
+- **`ApprovalErrorCode` gains `'CHAIN_INCOMPLETE'`** — the single canonical
+  error code for "finalize/commit attempted before the chain reached `approved`".
+  Hosts route it through `rethrowApprovalError` to the `approval.chain_incomplete`
+  wire code so all commit/post/finalize boundaries raise the same structured error.
+- **`assertApproved(chain, message?)`** — canonical finalize-time gate: asserts
+  the chain has reached `approved`, else throws `ApprovalError('CHAIN_INCOMPLETE')`.
+  A `null`/absent chain passes (no chain required). Use at every journal-entry
+  post, PO approve, transfer dispatch, etc. to replace per-domain hand-rolled
+  divergent codes with one definition.
+
+Purely additive — no existing exports changed.
+
 ## [0.15.0] - 2026-07-25
 
 ### Added — `/retention`: `PurgeEvidence` value object

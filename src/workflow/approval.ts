@@ -100,7 +100,12 @@ export type ApprovalErrorCode =
   | 'UNKNOWN_STEP'
   | 'UNAUTHORIZED_APPROVER'
   | 'STEP_NOT_ACTIVE'
-  | 'STEP_ALREADY_DECIDED_BY_APPROVER';
+  | 'STEP_ALREADY_DECIDED_BY_APPROVER'
+  /** A finalize/commit was attempted while the chain has not reached
+   *  `approved` (still `pending`, or `rejected`). The single canonical
+   *  "not yet approved" gate — hosts route it through arc-approval's
+   *  `rethrowApprovalError` to the `approval.chain_incomplete` wire code. */
+  | 'CHAIN_INCOMPLETE';
 
 export class ApprovalError extends Error {
   override readonly name = 'ApprovalError';
@@ -288,6 +293,24 @@ export function skipStep(chain: ApprovalChain, stepId: string, reason?: string):
 
 export function isApproved(chain: ApprovalChain): boolean {
   return chain.status === 'approved';
+}
+
+/**
+ * The canonical finalize-time gate: assert `chain` has reached `approved`,
+ * else throw `ApprovalError('CHAIN_INCOMPLETE')`. Use this at every
+ * commit/post/finalize boundary that must not proceed on an unapproved chain
+ * (journal-entry post, PO approve, transfer dispatch, …) so they all raise the
+ * SAME error instead of hand-rolling divergent codes. A `null`/absent chain is
+ * treated as "no chain required" and passes — callers that require a chain
+ * check presence separately.
+ */
+export function assertApproved(chain: ApprovalChain | null | undefined, message?: string): void {
+  if (chain != null && !isApproved(chain)) {
+    throw new ApprovalError(
+      'CHAIN_INCOMPLETE',
+      message ?? `approval chain has not reached 'approved' (status='${chain.status}')`,
+    );
+  }
 }
 
 export function isRejected(chain: ApprovalChain): boolean {
