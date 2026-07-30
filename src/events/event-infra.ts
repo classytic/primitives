@@ -197,6 +197,17 @@ export function createInProcessBus(options?: InProcessEventBusOptions): InProces
  * are test-inspection helpers (not part of the contract).
  */
 export class MemoryOutboxStore implements OutboxStore {
+  /**
+   * Deliberately NOT transactional — and saying so is the point.
+   *
+   * This store pushes onto an in-process array, which no database transaction
+   * can roll back. If a caller's Mongo write aborts after `save`, the event
+   * SURVIVES here and describes something that never happened. Declaring
+   * `false` lets a caller that needs real atomicity (`@classytic/access`) refuse
+   * at boot instead of silently inheriting a ghost-event path.
+   */
+  readonly transactionalSave = false;
+
   private events: Array<{ event: DomainEvent; acknowledgedAt?: Date }> = [];
 
   async save(event: DomainEvent, _options?: OutboxWriteOptions): Promise<void> {

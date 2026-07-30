@@ -29,6 +29,7 @@ export default defineConfig({
 
     // ─── identity ───────────────────────────────────────────────────────
     person: 'src/identity/person.ts',
+    subject: 'src/identity/subject.ts',
     address: 'src/identity/address.ts',
     phone: 'src/identity/phone.ts',
     'identity-verification': 'src/identity/identity-verification.ts',
@@ -48,6 +49,8 @@ export default defineConfig({
 
     // ─── workflow ───────────────────────────────────────────────────────
     'state-machine': 'src/workflow/state-machine.ts',
+    'state-diagram': 'src/workflow/state-diagram.ts',
+    suspension: 'src/workflow/suspension.ts',
     'status-history': 'src/workflow/status-history.ts',
     approval: 'src/workflow/approval.ts',
     hold: 'src/workflow/hold.ts',

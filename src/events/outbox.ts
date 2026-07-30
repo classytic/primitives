@@ -244,6 +244,32 @@ export class InvalidOutboxEventError extends Error {
  */
 export interface OutboxStore {
   /**
+   * Declares that `save` ENLISTS `options.session` in the caller's transaction,
+   * so the event row and the caller's domain write commit or roll back together.
+   *
+   * ## Why this must be declared rather than assumed
+   *
+   * `OutboxWriteOptions.session` is documented above as BEST-EFFORT — "stores may
+   * ignore fields they don't support". That is the right contract for a
+   * multi-backend interface, but it means a caller cannot infer atomicity from
+   * the mere presence of an outbox. A Redis-backed store, a store on a second
+   * Mongo connection, or one that simply drops the option will happily persist an
+   * event for a domain write that later rolls back — a GHOST event describing
+   * something that never happened. For an access-control or ledger consumer that
+   * is worse than a lost event, because downstream acts on it.
+   *
+   * Absent or `false` therefore means "assume NOT atomic". Callers that need the
+   * guarantee (see `@classytic/access`'s `atomically()`) check this flag and say
+   * so plainly at boot rather than claiming a property they cannot keep.
+   *
+   * Set `true` ONLY when `save` passes the session through to the same
+   * transactional resource the caller is writing (e.g. a mongoose model on the
+   * SAME connection). An in-memory store must NOT set it: it cannot participate
+   * in a Mongo transaction, so its write survives a rollback.
+   */
+  readonly transactionalSave?: boolean;
+
+  /**
    * Save an event to the outbox (typically called inside a business
    * transaction). MUST reject events missing `type` or `meta.id` — throw
    * rather than persist.

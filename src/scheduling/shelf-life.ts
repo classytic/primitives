@@ -34,6 +34,8 @@
  * // → { expiresAt: 2027-06-25…, removalDate: 2027-05-26…, alertDate: 2027-04-26… }
  */
 
+import { addDays } from './calendar.js';
+
 /** How a SKU's stock identity is tracked. Mirrors Odoo `product.tracking`. */
 export type TrackingMode = 'none' | 'lot' | 'serial';
 
@@ -202,10 +204,6 @@ export function shelfLifeStatus(dates: ShelfLifeDates, asOf: Date): ShelfLifeSta
 // ─────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────
-
-function addDays(d: Date, days: number): Date {
-  return new Date(d.getTime() + days * DAY_MS);
-}
 
 function defined<K extends string, V>(
   key: K,

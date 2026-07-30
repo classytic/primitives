@@ -3,6 +3,36 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-07-29
+
+### Added — `./subject`: `SubjectRef` polymorphic identity pointer
+
+- **`@classytic/primitives/subject`** — `SubjectRef` (`{ subjectModel, subjectRef }`) — WHO a record is about, polymorphically. The pairing spans every kernel that holds data about a person without owning them (attendance, access, loyalty, credentials). Deliberately kept distinct from `ExternalRef` (provenance — "came from") even though the shapes are identical: a grant carries both at once and they mean different things.
+- **`buildSubjectRef(model, id)`** — returns `SubjectRef | null`; `null` when `id` is absent/blank, because a malformed binding silently matches nothing (an entitlement nobody holds, a credential no revoke can find) rather than carrying `"undefined"` as a string.
+- **`SubjectRef`** type exported from `@classytic/primitives/subject`.
+
+### Added — `./state-diagram`: Mermaid diagram from a `StateMachine`
+
+- **`@classytic/primitives/state-diagram`** — `renderStateDiagram(machine, opts?)` — generates a `stateDiagram-v2` Mermaid string from the same `StateMachine` object the runtime CAS enforces. Removes the class of drift where a hand-drawn prose comment diverges from the actual transition table. Pure: string in, string out, no I/O.
+- **`StateDiagramOptions`** — `title?`, `highlight?` (mark specific states), `noteOn?` (per-state annotations).
+
+### Added — `./suspension`: time-bounded suspension/pause policy
+
+- **`@classytic/primitives/suspension`** — pure suspension policy computation (no persistence). Models a pause the subject is ENTITLED to take, bounded by an annual allowance, that ends by itself — distinct from `/hold` (an indefinite blocker needing manual resolution).
+- **`evaluateSuspension(policy, history, opts)`** — always returns `autoResumeAt` (the instant the pause MUST end) so a sweep can resume it whether or not the subject ever comes back. Covers: gym membership freeze, subscription pause, unpaid leave.
+- **`SuspensionPolicy`** — `maxDaysPerPeriod`, `minDurationDays`, `period` ('annual' | 'rolling').
+- **`SuspensionEntry`** — a historical pause record (`startedAt`, `endedAt?`, `reason?`).
+- **`SuspensionResult`** — `autoResumeAt`, `daysUsed`, `daysRemaining`, `status`.
+
+### Added — `OutboxStore.transactionalSave` (`/outbox`)
+
+- **`OutboxStore.transactionalSave?: boolean`** — declares whether `save` enlists `options.session` in the caller's transaction. Absent/`false` = "assume NOT atomic". Set `true` ONLY when `save` passes the session to the same transactional resource the caller writes (e.g. a mongoose model on the same connection). Callers that need atomicity (`@classytic/access`'s `atomically()`) check this flag and fail at boot rather than claiming a guarantee they cannot keep.
+- **`MemoryOutboxStore.transactionalSave = false`** — explicitly declared; an in-memory store cannot participate in a Mongo transaction, so its write survives a rollback.
+
+### Changed — `shelf-life.ts` deduplicates `addDays`
+
+- `addDays` is now imported from `./calendar` instead of being re-defined inline. No behavior change.
+
 ## [0.16.0] - 2026-07-27
 
 ### Added — `assertApproved` + `CHAIN_INCOMPLETE` (`/approval`)
