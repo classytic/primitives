@@ -26,6 +26,8 @@ export default defineConfig({
     'payment-gateway': 'src/money/payment-gateway.ts',
     'payment-method-kind': 'src/money/payment-method-kind.ts',
     'payment-allocation-status': 'src/money/payment-allocation-status.ts',
+    monetization: 'src/money/monetization.ts',
+    proration: 'src/money/proration.ts',
 
     // ─── identity ───────────────────────────────────────────────────────
     person: 'src/identity/person.ts',

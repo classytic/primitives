@@ -3,6 +3,42 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-08-01
+
+### Added — `./monetization`: canonical pricing classification contract
+
+- **`@classytic/primitives/monetization`** — the single home for how a product
+  is sold and priced, so the classification survives end-to-end across catalog,
+  revenue, order, and entitlement kernels without each maintaining its own enum.
+- **`Monetization`** discriminated union — `FreeMonetization | OneTimeMonetization |
+  SubscriptionMonetization | BundleMonetization | UsageMonetization`, each
+  carrying its own nested pricing shape.
+- **`MONETIZATION_KINDS`** + **`MonetizationKind`** + **`isMonetizationKind`** —
+  exhaustive kind list with runtime guard.
+- Type-guard predicates: **`isFreeMonetization`**, **`isOneTimeMonetization`**,
+  **`isSubscriptionMonetization`**, **`isBundleMonetization`**,
+  **`isUsageMonetization`**.
+- Supporting types: `PriceTier`, `OneTimePricing`, `SubscriptionPlan`,
+  `UsageTier`, `UsageRating`, `DurationUnit`, `MoneyByCurrency`.
+
+### Added — `./proration`: pure proration arithmetic
+
+- **`@classytic/primitives/proration`** — timezone-agnostic, policy-free
+  proration math. Holds no commercial policy (no upgrade/downgrade semantics,
+  no discount or tax logic) — those live in the contract kernel.
+- **`periodProgress(input)`** — fraction of a billing period consumed given
+  start, end, and current instants as `Date`. Returns `PeriodFraction`.
+- **`splitByPeriodFraction(amount, fraction, granularity?)`** — split a `Money`
+  amount into consumed/remaining parts; `granularity: 'whole_day'` (default) or
+  `'exact'`.
+- **`allocateMoneyByFraction(amount, fraction)`** — proportional allocation
+  using the largest-remainder allocator so `consumed + remaining === amount`
+  exactly (no penny drift).
+- **`ProrationError`** + **`ProrationErrorCode`** (`INVALID_PERIOD` |
+  `INVALID_FRACTION`) — typed errors for out-of-range inputs.
+- Supporting types: `PeriodFraction`, `PeriodProgressInput`,
+  `ProrationGranularity`.
+
 ## [0.18.0] - 2026-07-29
 
 ### Added — `./subject`: `SubjectRef` polymorphic identity pointer
