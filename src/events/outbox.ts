@@ -242,6 +242,20 @@ export class InvalidOutboxEventError extends Error {
  *    `claimPending`.** If the underlying storage has corrupt rows, the
  *    store is responsible for quarantining them.
  */
+/**
+ * The delivery states an outbox row can hold.
+ *
+ * Named HERE, in the contract, rather than in each store. It went unnamed while every
+ * method took an event id and none took a state — `countByStatus` is the first member
+ * that makes the vocabulary part of the interface, and two stores had already written
+ * the same three strings independently by then.
+ *
+ * `dead_letter` is terminal until an operator calls `requeue`; it is a durable statement
+ * that something is owed, not a deletion.
+ */
+export const OUTBOX_STATUSES = ['pending', 'delivered', 'dead_letter'] as const;
+export type OutboxStatus = (typeof OUTBOX_STATUSES)[number];
+
 export interface OutboxStore {
   /**
    * Declares that `save` ENLISTS `options.session` in the caller's transaction,
@@ -334,4 +348,42 @@ export interface OutboxStore {
    * @returns Number of purged events.
    */
   purge?(olderThanMs: number): Promise<number>;
+
+  /**
+   * Re-drive ONE dead-lettered event: back to `pending`, attempts reset, lease cleared,
+   * immediately visible.
+   *
+   * The other half of `fail({ deadLetter: true })`. Dead-lettering is only a durable
+   * statement that something is owed; a store that can dead-letter but not requeue leaves
+   * an operator who has fixed the root cause with no way to act on the worklist except
+   * hand-editing rows in the database.
+   *
+   * MUST be scoped to `dead_letter` — requeuing a `pending` row would reset the attempt
+   * count on an event that is merely backing off, defeating the retry policy, and
+   * requeuing a `delivered` row would republish an event every subscriber already saw.
+   *
+   * @returns `true` if a dead-lettered event was requeued, `false` if no such event
+   *   exists — NOT an error. An operator re-driving a worklist races the relay, and an
+   *   id that has already been dealt with is an ordinary outcome.
+   */
+  requeue?(eventId: string): Promise<boolean>;
+
+  /**
+   * How many events are in `status`. The health surface behind an operator dashboard or
+   * an alert (`dead_letter > 0` means money or access may be unrecorded).
+   */
+  countByStatus?(status: OutboxStatus): Promise<number>;
+
+  /**
+   * Age in ms of the OLDEST pending event, or `null` when nothing is pending.
+   *
+   * The single most useful outbox health signal, and the one a naive dashboard misses: a
+   * pending COUNT looks identical whether the queue is draining briskly or has been
+   * wedged for an hour behind one poison row. Age distinguishes them.
+   *
+   * Measured from the event's creation, not its last attempt — the question being asked
+   * is "how long has this event gone undelivered", and resetting the clock on each retry
+   * would make a permanently-failing row look permanently fresh.
+   */
+  oldestPendingAgeMs?(): Promise<number | null>;
 }

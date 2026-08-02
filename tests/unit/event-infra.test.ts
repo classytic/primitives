@@ -7,11 +7,10 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import {
-  createInProcessBus,
-  InProcessEventBus,
-  MemoryOutboxStore,
-} from '../../src/events/event-infra.js';
+import { createInProcessBus, InProcessEventBus } from '../../src/events/event-infra.js';
+// One import path for the store — `/event-infra` is the bus subpath and no
+// longer re-exports it (see the note at the foot of `src/events/event-infra.ts`).
+import { MemoryOutboxStore } from '../../src/events/memory-outbox.js';
 import { createEvent, createScopedEvent, scopedEventMeta } from '../../src/events/events.js';
 
 describe('InProcessEventBus', () => {

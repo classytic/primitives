@@ -66,7 +66,9 @@ const checks = [
   ['./events', 'scopedEventMeta'],
   ['./event-infra', 'InProcessEventBus'],
   ['./event-infra', 'createInProcessBus'],
-  ['./event-infra', 'MemoryOutboxStore'],
+  // 0.20.0: the store moved to its own subpath. `/event-infra` is the BUS —
+  // it no longer re-exports `MemoryOutboxStore`, and there is no compat path.
+  ['./memory-outbox', 'MemoryOutboxStore'],
 ];
 
 const failures = [];

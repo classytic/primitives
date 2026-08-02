@@ -342,6 +342,29 @@ export function addCivilDays(cd: CivilDate, days: number): CivilDate {
  * Whole days from `a` to `b` (positive when `b` is later) — the NIGHTS
  * count for a `[checkIn, checkOut)` stay expressed as civil dates.
  */
+/**
+ * The ISO-8601 week a civil date belongs to, as `YYYY-Www`.
+ *
+ * Zone-free by definition — a civil date has no zone — so callers resolve the
+ * date in their business timezone FIRST (`civilDateOf`) and label it here.
+ *
+ * ISO week 1 is the week containing the first Thursday, which means the week
+ * YEAR can differ from the date's own: 2025-12-29 is `2026-W01`. Naive
+ * "day-of-year / 7" numbering gets that wrong every few years, silently
+ * splitting one business week across two report buckets.
+ */
+export function isoWeekOfCivilDate(cd: CivilDate): string {
+  const m = CIVIL_RE.exec(cd);
+  if (!m) throw new TimeZoneError(`Invalid civil date '${cd}'.`);
+  const utc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const dow = new Date(utc).getUTCDay() || 7; // Sunday 0 -> ISO 7
+  // The Thursday of this ISO week decides the week-year.
+  const thursday = new Date(utc + (4 - dow) * 86_400_000);
+  const weekYear = thursday.getUTCFullYear();
+  const week = Math.floor((thursday.getTime() - Date.UTC(weekYear, 0, 1)) / 86_400_000 / 7) + 1;
+  return `${weekYear}-W${String(week).padStart(2, '0')}`;
+}
+
 export function civilDaysBetween(a: CivilDate, b: CivilDate): number {
   const pa = CIVIL_RE.exec(a);
   const pb = CIVIL_RE.exec(b);

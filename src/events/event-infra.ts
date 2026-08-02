@@ -10,7 +10,8 @@
  * memory outbox for tests/dev, and kernels cannot dep arc — so before this
  * module existed each kernel carried its own ~60-line copy (26 drifted
  * `in-process-bus.ts` copies, 15 `outbox-store.ts` copies across
- * commerce/packages). This subpath is the single shared implementation.
+ * commerce/packages). This subpath is the single shared BUS implementation;
+ * the memory outbox has its own subpath (`/memory-outbox`).
  * Kernels keep their public class names as thin subclasses:
  *
  * ```ts
@@ -29,11 +30,6 @@ import type {
   PublishManyResult,
 } from './events.js';
 import { matchEventPattern } from './events.js';
-import type {
-  OutboxAcknowledgeOptions,
-  OutboxStore,
-  OutboxWriteOptions,
-} from './outbox.js';
 
 /** Minimal error-only logger — assignable from `console`, pino, fastify.log. */
 export interface ErrorLogger {
@@ -186,62 +182,21 @@ export function createInProcessBus(options?: InProcessEventBusOptions): InProces
 }
 
 /**
- * In-memory {@link OutboxStore} for tests and local dev. Not for production —
- * hosts wire arc's `MongoOutboxStore`, a mongokit repo via
- * `repositoryAsOutboxStore`, or any durable implementation.
+ * `MemoryOutboxStore` does NOT live here. It is exported from exactly one
+ * place: `@classytic/primitives/memory-outbox`.
  *
- * Implements the required trio (`save` / `getPending` / `acknowledge`) plus
- * optional `purge`. Lease-based methods (`claimPending` / `fail` /
- * `getDeadLettered`) are intentionally omitted — single-process tests don't
- * need them, and kernels only call `save()` themselves. `all()` / `clear()`
- * are test-inspection helpers (not part of the contract).
+ * This module used to also export it — first as a second, MINIMAL
+ * implementation (save / getPending / acknowledge / purge, no leases, no
+ * retry, no dead-lettering, no dedupe, no validation), then briefly as a
+ * back-compat re-export. Both are gone.
+ *
+ * The re-export was tempting: seven kernels imported it from here, and one
+ * line would have spared seven rebuilds. It was still the wrong call. Two live
+ * import paths for one class means new code picks either, the migration stays
+ * permanently half-done, and the next person has to learn which path is
+ * "real". The cost of the move is seven rebuilds; paying it once is cheaper
+ * than carrying a shim forever.
+ *
+ * This subpath is the in-process BUS. The outbox is its own subpath.
  */
-export class MemoryOutboxStore implements OutboxStore {
-  /**
-   * Deliberately NOT transactional — and saying so is the point.
-   *
-   * This store pushes onto an in-process array, which no database transaction
-   * can roll back. If a caller's Mongo write aborts after `save`, the event
-   * SURVIVES here and describes something that never happened. Declaring
-   * `false` lets a caller that needs real atomicity (`@classytic/access`) refuse
-   * at boot instead of silently inheriting a ghost-event path.
-   */
-  readonly transactionalSave = false;
 
-  private events: Array<{ event: DomainEvent; acknowledgedAt?: Date }> = [];
-
-  async save(event: DomainEvent, _options?: OutboxWriteOptions): Promise<void> {
-    this.events.push({ event });
-  }
-
-  async getPending(limit: number): Promise<DomainEvent[]> {
-    return this.events
-      .filter((e) => !e.acknowledgedAt)
-      .slice(0, limit)
-      .map((e) => e.event);
-  }
-
-  async acknowledge(eventId: string, _options?: OutboxAcknowledgeOptions): Promise<void> {
-    const entry = this.events.find((e) => e.event.meta.id === eventId);
-    if (entry) entry.acknowledgedAt = new Date();
-  }
-
-  async purge(olderThanMs: number): Promise<number> {
-    const cutoff = Date.now() - olderThanMs;
-    const before = this.events.length;
-    this.events = this.events.filter(
-      (e) => !e.acknowledgedAt || e.acknowledgedAt.getTime() >= cutoff,
-    );
-    return before - this.events.length;
-  }
-
-  /** Every saved event (acknowledged or not) — test inspection helper. */
-  all(): ReadonlyArray<DomainEvent> {
-    return this.events.map((e) => e.event);
-  }
-
-  /** Reset the store — test helper. */
-  clear(): void {
-    this.events = [];
-  }
-}
