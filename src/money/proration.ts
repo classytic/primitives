@@ -1,5 +1,5 @@
 import type { Money } from './money.js';
-import { allocate } from './split-allocation.js';
+import { allocate, type SplitResult } from './split-allocation.js';
 
 /**
  * Pure proration ARITHMETIC — fraction / period / allocation / rounding only.
@@ -56,7 +56,7 @@ export interface PeriodProgressInput {
   readonly granularity?: ProrationGranularity;
 }
 
-export type ProrationErrorCode = 'INVALID_PERIOD' | 'INVALID_FRACTION';
+export type ProrationErrorCode = 'INVALID_PERIOD' | 'INVALID_FRACTION' | 'ALLOCATION_INVARIANT';
 
 export class ProrationError extends Error {
   override readonly name = 'ProrationError';
@@ -83,7 +83,10 @@ function isValidDate(d: Date): boolean {
 export function periodProgress(input: PeriodProgressInput): PeriodFraction {
   const { periodStart, periodEnd, asOf, granularity = 'whole_day' } = input;
   if (!isValidDate(periodStart) || !isValidDate(periodEnd) || !isValidDate(asOf)) {
-    throw new ProrationError('INVALID_PERIOD', 'periodStart, periodEnd and asOf must be valid Dates');
+    throw new ProrationError(
+      'INVALID_PERIOD',
+      'periodStart, periodEnd and asOf must be valid Dates',
+    );
   }
   const startMs = periodStart.getTime();
   const endMs = periodEnd.getTime();
@@ -140,12 +143,30 @@ export function splitByPeriodFraction(
     ],
     'by-weight',
   );
-  const consumed = result.parts.find((p) => p.id === 'consumed')?.amount ?? 0;
-  const remaining = result.parts.find((p) => p.id === 'remaining')?.amount ?? 0;
   return {
-    consumed: { amount: consumed, currency: amount.currency },
-    remaining: { amount: remaining, currency: amount.currency },
+    consumed: { amount: requirePart(result, 'consumed'), currency: amount.currency },
+    remaining: { amount: requirePart(result, 'remaining'), currency: amount.currency },
   };
+}
+
+/**
+ * Read one allocated part by id, or THROW.
+ *
+ * This used to be `…?.amount ?? 0`. A missing part is not "no money" — it is a
+ * broken allocator, and defaulting it to zero turns that into a silently
+ * plausible number: the unused-value credit on a plan change becomes 0 and the
+ * customer is quietly not credited. Nothing downstream can tell that apart from
+ * a genuinely fully-consumed period.
+ */
+function requirePart(result: SplitResult, id: string): number {
+  const part = result.parts.find((p) => p.id === id);
+  if (part === undefined) {
+    throw new ProrationError(
+      'ALLOCATION_INVARIANT',
+      `allocator returned no part '${id}' (got: ${result.parts.map((p) => p.id).join(', ') || 'none'})`,
+    );
+  }
+  return part.amount;
 }
 
 /**
@@ -168,6 +189,5 @@ export function allocateMoneyByFraction(amount: Money, fraction: number): Money 
     ],
     'by-weight',
   );
-  const part = result.parts.find((p) => p.id === 'part')?.amount ?? 0;
-  return { amount: part, currency: amount.currency };
+  return { amount: requirePart(result, 'part'), currency: amount.currency };
 }

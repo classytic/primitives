@@ -3,6 +3,161 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-08-05
+
+### Added — `./period` OWNS timezone-aware period resolution (was two copies above the kernels)
+
+`Period` was `{ year, month?, quarter? }` with no timezone and no resolver, so it
+could not express "the business month of August in Asia/Dhaka". The resolver
+existed TWICE, both ABOVE the kernels — `@spinekit/kit/period`
+(`createBusinessCalendar`) and be-prod's `#lib/utils/business-date` — which meant
+a kernel could reach neither and re-derived the boundary inline with `Date.UTC`.
+Five silent UTC-month defects came out of that (`aggregateMonthlyVat`, the
+sales-fact reconciler, and three in bd-tax Mushak).
+
+This is a MOVE of the proven `createBusinessCalendar` logic, not a re-derivation:
+same civil-date round-trip through `/timezone`, same half-open ranges, same
+DST-exactness.
+
+- **`Period.timezone?`** — the IANA zone a period is DEFINED in, so a persisted or
+  transported period keeps its own calendar.
+- **`resolvePeriod(period, timezone?)`** → half-open `DateRange`. Throws when no
+  zone is available anywhere (never silently answers in UTC) and throws when the
+  period's zone and the caller's zone DISAGREE.
+- **`resolveDay` / `resolveMonth` / `resolveQuarter` / `resolveYear` /
+  `resolveDateSpan` / `dayStart`** — the granularity-specific forms. All return
+  HALF-OPEN `[start, end)`, which tiles exactly.
+- **`periodOf(instant, granularity, timezone)`** — the inverse: which filing
+  period an instant belongs to on the LOCAL calendar.
+- **`parsePeriod` / `formatPeriod` / `granularityOf` / `periodTimeZone`** —
+  `'YYYY'` · `'YYYY-MM'` · `'YYYY-Qn'`. `parsePeriod` REFUSES a `'YYYY-MM-DD'`
+  rather than reading it as its month (a ~30× widening).
+- **`inclusiveEnd(range)`** — `end - 1ms` for legacy `$lte` call sites, derived
+  from the resolved end so it stays DST-exact.
+- **`PeriodError`** + **`PeriodErrorCode`** (`AMBIGUOUS_PERIOD` ·
+  `INCOMPLETE_RANGE` · `INVALID_FIELD` · `MISSING_TIMEZONE` · `TIMEZONE_CONFLICT`
+  · `INVALID_LABEL`).
+
+A `Period` carrying two resolution shapes (`month` + `quarter`, or either with
+`start`/`end`) now throws instead of preferring one.
+
+### Added — `./idempotency`: the claim + lease CONTRACT
+
+Three kernels hand-rolled incompatible versions of one state machine — `cart`
+(`in_flight`/`succeeded`/`failed`, the only one with crash-window leasing),
+`catalog` offers (`pending`/`completed`, no lease), `contract` amendments
+(implicit). Types + PURE helpers only; no persistence, no collection, no driver.
+
+- **`ClaimOutcome = 'claimed' | 'replayed' | 'in_flight'`** — three-valued, and
+  `in_flight` is NOT a failure. Mapping a live concurrent lease onto an error
+  licenses a retry, which is a double-apply.
+- **`IdempotencyClaim`** (`identity` · `requestFingerprint` · `state` ·
+  `leaseToken` · `leaseExpiresAt` · `attempts` · `result`), **`ClaimResult`**,
+  **`ClaimState`**, **`IdempotencyIdentity`**.
+- **`decideClaim(existing, request)`** — the whole state machine as one pure
+  function. Throws `FINGERPRINT_MISMATCH` (same key, different body) and
+  `MISSING_REPLAY` (terminal record with no stored result) rather than answering.
+- **`completeClaim` / `renewLease`** — both refuse when the caller lost its lease,
+  so a superseded attempt cannot overwrite the winner's result.
+- **`identityKey`** (canonical-JSON composite, so a delimiter inside a scope value
+  cannot collide two identities), **`fingerprintRequest`**, **`newLeaseToken`**,
+  **`isLeaseExpired`**, **`holdsLease`**, **`isInFlight`**, **`DEFAULT_LEASE_MS`**.
+
+### Changed — BREAKING: five API decisions taken before spine wiring starts
+
+- **`./cadence` — `Cadence.timezone` is now AUTHORITATIVE, not display-only.**
+  It was documented as decorative while `stepMonthly`/`stepYearly` used
+  `getUTCMonth()`/`getUTCDate()`, so `timezone: 'Asia/Dhaka'` + `dayOfMonth: 1`
+  with a midnight anchor placed every occurrence on the local **2nd**. All four
+  kinds now run on the zone's wall clock when one is set (daily advances LOCAL
+  days — 23h/25h across a DST transition), and stay UTC when it is absent.
+  `validateCadence` rejects an unresolvable zone with the new
+  `INVALID_TIMEZONE`. **Behavioural change for any persisted cadence that
+  already carries a `timezone`** — the occurrences move to where the field
+  always claimed they were.
+- **`./approval` — `assertApproved` no longer passes on a `null` chain.** It now
+  throws the new `CHAIN_MISSING`. Absence is not approval, and a mongoose schema
+  that never declared `approvalChain` strips it on write, so the gate could not
+  tell "no approval configured" from "approval silently lost". The explicit
+  opt-out is the new **`assertApprovedIfPresent`**. The second parameter is now
+  an options object (`{ message }`), not a bare string.
+- **`./payment-events` — every payload carries an `eventType` discriminant, and
+  there is a `payment.unknown` event.** `PaymentInitiatedPayload` and
+  `PaymentSucceededPayload` were structurally IDENTICAL with no discriminant on
+  the union, so a handler typed for "funds received" accepted "money in flight".
+  Adds **`PaymentUnknownPayload`** (the port contract's third outcome had no
+  event, so an unobserved result had to be forced into SUCCEEDED or FAILED),
+  **`PaymentEventPayloadMap`**, **`isPaymentEvent`**, **`isFundsReceived`**, and
+  three compile-time drift guards over the map.
+- **`./currency` — `convertWithSnapshot` / `reverseWithSnapshot` take and return
+  `Money`.** A bare `number` meant nothing checked the amount was denominated in
+  `fx.sourceCurrency`; a USD→BDT snapshot applied to a EUR amount type-checked
+  and returned a plausible wrong number. Both now throw `CurrencyMismatchError`
+  on a mismatch, handle differing minor-unit exponents (USD 2 → JPY 0), and take
+  an explicit **`FxRounding`** (`'half-away-from-zero'` default · `'floor'` ·
+  `'ceil'`) instead of returning an unrounded float for each caller to round
+  differently.
+- **`./money` — `Money.currency` is `CurrencyCode`, not `CurrencyCode | string`.**
+  A union with `string` collapses to `string`, so the brand was decoration on
+  the one type where it matters and `money()` validated nothing. `money()`,
+  `fromMajor()` and `sumMoney()` now validate and brand; `isMoney` format-checks
+  the code instead of `typeof === 'string'`. New **`currencyCode(value)`**
+  (throwing constructor) and **`InvalidCurrencyCodeError`**.
+  **`CurrencyMismatchError` is now DECLARED in `./currency`** (so the FX seam can
+  throw it without an ESM cycle) and re-exported from `./money`, so existing
+  imports are unaffected.
+
+Migration: a `Money` object literal now needs a branded code —
+`money(1999, 'USD')`, or `{ amount: 1999, currency: currencyCode('USD') }`.
+
+### Changed — six silent-permissiveness defects now FAIL instead of answering
+
+Every item below previously returned a plausible-looking value where it should
+have errored. All are behaviour changes for malformed input only; correct input
+is unaffected. Falsifying tests live in `tests/unit/fail-loud-regressions.test.ts`.
+
+- **`./period` — an Invalid Date no longer reports "no overlap".** `rangesOverlap`,
+  `isWithin` and `rangeDurationMs` throw the new `DateRangeError` on a non-finite
+  endpoint; `isDateRange` returns `false` for one. Every comparison against `NaN`
+  is `false`, so a corrupt range used to answer "no conflict" — the PERMISSIVE
+  answer for the three documented consumers (order booking collision, flow
+  reservation-window collision, promo campaign overlap), i.e. a silent double-book.
+- **`./currency` — the ISO 4217 exponent table is now exhaustive.** All 0-decimal
+  (`BIF CLP DJF GNF ISK KMF KRW PYG RWF UGX UYI VND VUV XAF XOF XPF`), 3-decimal
+  (`BHD IQD JOD KWD LYD OMR TND`) and 4-decimal (`CLF UYW`) currencies are listed,
+  so `minorUnitFactor`'s `?? 100` fallback is reachable only by a code that is not
+  a real ISO currency. Previously `fromMajor(1500, 'GNF')` stored 150 000 minor
+  units — a 100× error that looks like a number. New `isKnownCurrency(code)`
+  distinguishes "listed" from "assumed" for boot-time config validation.
+- **`./proration` — a missing allocated part throws instead of becoming `0`.** The
+  `?? 0` fallbacks in `splitByPeriodFraction` / `allocateMoneyByFraction` are now
+  `ProrationError('ALLOCATION_INVARIANT')`. A zero credit and a genuinely
+  fully-consumed period were indistinguishable downstream.
+- **`./state-machine` — `assertAndClaim` rejects an EMPTY `from` list.**
+  `validSources(to)` returns `[]` for an unreachable status, and the documented
+  `from: machine.validSources(x)` idiom then ran the assert loop zero times and
+  handed the CAS an empty allow-list. An empty allow-list must never mean "any".
+- **`./timezone` — the offset regex is anchored.** An offset label the runtime
+  emits in an unexpected shape (e.g. an unpadded `GMT+5:30`) matched the optional
+  bare-`GMT` branch and resolved to **UTC**, silently shifting every business-day
+  boundary derived from it. Unrecognised labels now throw; `\d{1,2}` accepts the
+  unpadded variant rather than mis-reading it.
+- **`./canonical` — class instances are rejected, not collapsed.** A
+  `Types.ObjectId`, `Buffer` or hydrated Mongoose subdocument has no own
+  enumerable keys, so it digested as `{}` and two manifests referencing DIFFERENT
+  documents hashed identically — the integrity check reported "unchanged".
+  `canonicalJson` now throws `CanonicalizeError` for any object whose prototype is
+  neither `Object.prototype` nor `null`. Plain objects, null-prototype objects,
+  arrays and `Date` are unaffected.
+
+### Changed — the publish smoke gate now sweeps the whole export map
+
+`tests/smoke/smoke.mjs` derives its subpath list from `package.json#exports`
+(44/44) instead of a hand-maintained list that covered 23, and asserts each entry
+declares both `types` and `default` and that both files exist. The gate runs in
+`prepublishOnly`; previously a subpath that lost its tsdown entry would have
+published an export map pointing at a missing file with the gate printing OK.
+
 ## [0.19.0] - 2026-08-01
 
 ### Added — `./monetization`: canonical pricing classification contract

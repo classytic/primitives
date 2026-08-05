@@ -69,9 +69,61 @@ const checks = [
   // 0.20.0: the store moved to its own subpath. `/event-infra` is the BUS —
   // it no longer re-exports `MemoryOutboxStore`, and there is no compat path.
   ['./memory-outbox', 'MemoryOutboxStore'],
+  // ─── 0.21.0 additions ────────────────────────────────────────────────
+  // Period resolution moved DOWN into primitives (was @spinekit/kit/period
+  // + be-prod business-date, both above the kernels).
+  ['./period', 'resolvePeriod'],
+  ['./period', 'resolveMonth'],
+  ['./period', 'resolveDay'],
+  ['./period', 'periodOf'],
+  ['./period', 'parsePeriod'],
+  ['./period', 'inclusiveEnd'],
+  ['./idempotency', 'decideClaim'],
+  ['./idempotency', 'completeClaim'],
+  ['./idempotency', 'fingerprintRequest'],
+  ['./idempotency', 'newLeaseToken'],
+  ['./approval', 'assertApproved'],
+  ['./approval', 'assertApprovedIfPresent'],
+  ['./currency', 'currencyCode'],
+  ['./currency', 'convertWithSnapshot'],
+  ['./money', 'CurrencyMismatchError'],
+  ['./payment-events', 'isPaymentEvent'],
+  ['./payment-events', 'isFundsReceived'],
 ];
 
 const failures = [];
+
+/**
+ * EXHAUSTIVE subpath sweep — derived from `package.json#exports`, not from the
+ * curated `checks` list below.
+ *
+ * The docblock at the top of this file claims to verify "every subpath declared
+ * in package.json exports". It did not: `checks` is hand-maintained and covered
+ * 23 of 43. The other 20 could have lost their tsdown entry — leaving an export
+ * map pointing at a file that does not exist — and this gate, which
+ * `prepublishOnly` runs, would still print OK. A release gate that enumerates
+ * its own subset is not a gate on the surface; deriving the list is what makes
+ * the claim true.
+ */
+const allSubpaths = Object.keys(pkg.exports).filter((k) => k !== './package.json');
+for (const subpath of allSubpaths) {
+  const exp = pkg.exports[subpath];
+  if (!exp?.default || !exp?.types) {
+    failures.push(`[${subpath}] exports entry must declare both "types" and "default"`);
+    continue;
+  }
+  try {
+    await loadDist(exp.default);
+  } catch (err) {
+    failures.push(`[${subpath}] import failed: ${err.message}`);
+  }
+  try {
+    readFileSync(resolve(pkgRoot, exp.types));
+  } catch {
+    failures.push(`[${subpath}] declaration file missing: ${exp.types}`);
+  }
+}
+console.log(`  ok  all ${allSubpaths.length} declared subpaths import + ship declarations`);
 
 for (const [subpath, symbol] of checks) {
   const exp = pkg.exports[subpath];
@@ -191,10 +243,68 @@ const status = evaluateSLAStatus(
 assert.equal(status.kind, 'Failed');
 assert.equal(status.breached, true);
 
+// Functional smoke: the business month is the LOCAL month, from the built dist.
+const { resolveMonth, resolvePeriod, periodOf } = await loadDist(pkg.exports['./period'].default);
+const august = resolveMonth(2026, 8, 'Asia/Dhaka');
+assert.equal(august.start.toISOString(), '2026-07-31T18:00:00.000Z', 'period: Dhaka August must start six hours before the UTC month');
+assert.equal(august.end.toISOString(), '2026-08-31T18:00:00.000Z');
+assert.deepEqual(periodOf(new Date('2026-07-31T18:30:00Z'), 'month', 'Asia/Dhaka'), {
+  year: 2026,
+  month: 8,
+  timezone: 'Asia/Dhaka',
+});
+let periodThrew = null;
+try {
+  resolvePeriod({ year: 2026, month: 8 });
+} catch (err) {
+  periodThrew = err;
+}
+assert.ok(periodThrew, 'period: resolving with no timezone must throw, never fall back to UTC');
+
+// Functional smoke: idempotency's three-valued outcome from the built dist.
+const { decideClaim, completeClaim, fingerprintRequest, DEFAULT_LEASE_MS } = await loadDist(
+  pkg.exports['./idempotency'].default,
+);
+const idemNow = new Date('2026-08-05T10:00:00Z');
+const idemIdentity = { operation: 'checkout.finalize', key: 'k1' };
+const idemFp = fingerprintRequest({ total: 100 });
+const first = decideClaim(null, {
+  identity: idemIdentity,
+  requestFingerprint: idemFp,
+  now: idemNow,
+  leaseToken: 'lease-A',
+});
+assert.equal(first.outcome, 'claimed');
+const concurrent = decideClaim(first.claim, {
+  identity: idemIdentity,
+  requestFingerprint: idemFp,
+  now: new Date(idemNow.getTime() + 1000),
+  leaseToken: 'lease-B',
+});
+assert.equal(concurrent.outcome, 'in_flight', 'idempotency: a live lease is in_flight, not a failure');
+assert.ok(concurrent.retryAfterMs > 0 && concurrent.retryAfterMs <= DEFAULT_LEASE_MS);
+const settled = completeClaim(first.claim, {
+  leaseToken: 'lease-A',
+  now: new Date(idemNow.getTime() + 2000),
+  result: { status: 'succeeded', value: 'ok' },
+});
+assert.equal(
+  decideClaim(settled, {
+    identity: idemIdentity,
+    requestFingerprint: idemFp,
+    now: new Date(idemNow.getTime() + 3000),
+    leaseToken: 'lease-C',
+  }).outcome,
+  'replayed',
+);
+
 if (failures.length > 0) {
   console.error('\n smoke FAILED:');
   for (const f of failures) console.error(`  - ${f}`);
   process.exit(1);
 }
 
-console.log(`\n smoke OK — ${checks.length} subpath exports + functional checks passed`);
+console.log(
+  `\n smoke OK — ${allSubpaths.length} declared subpaths swept, ` +
+    `${checks.length} headline-symbol checks + functional checks passed`,
+);

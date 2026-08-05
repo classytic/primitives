@@ -31,6 +31,7 @@ export default defineConfig({
 
     // ─── identity ───────────────────────────────────────────────────────
     person: 'src/identity/person.ts',
+    'person-parse': 'src/identity/person-parse.ts',
     subject: 'src/identity/subject.ts',
     address: 'src/identity/address.ts',
     phone: 'src/identity/phone.ts',
@@ -55,6 +56,7 @@ export default defineConfig({
     suspension: 'src/workflow/suspension.ts',
     'status-history': 'src/workflow/status-history.ts',
     approval: 'src/workflow/approval.ts',
+    idempotency: 'src/workflow/idempotency.ts',
     hold: 'src/workflow/hold.ts',
     condition: 'src/workflow/condition.ts',
 

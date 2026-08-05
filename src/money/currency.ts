@@ -1,4 +1,8 @@
 import type { Brand } from '../composition/brand.js';
+// TYPE-only: `/money` imports `minorUnitFactor` from here at runtime, so a
+// value import back would be a genuine ESM cycle. Everything this file needs
+// from Money is erased at build time.
+import type { Money } from './money.js';
 
 /**
  * ISO 4217 currency code (3 uppercase letters).
@@ -37,11 +41,20 @@ export const CURRENCIES = {
 } as const satisfies Record<string, string>;
 
 /**
- * Number of minor units per major unit for common currencies.
+ * Number of minor units per major unit, by ISO 4217 code.
  *
- * ISO 4217 defines most currencies with 2 decimal places (cents). A few are
- * zero-decimal (JPY, KRW) or three-decimal (BHD, KWD, JOD). When a currency
- * isn't in this table, {@link minorUnitFactor} returns 100 as the safe default.
+ * **This table must list EVERY currency whose exponent is not 2.** ISO 4217
+ * defaults to 2 decimals, and {@link minorUnitFactor} falls back to 100 for a
+ * code it does not know — which is correct for the ~150 two-decimal currencies
+ * and catastrophically wrong for the others. A missing zero-decimal entry does
+ * not throw: it makes `fromMajor(1500, 'GNF')` store 150 000 minor units, a
+ * 100× error that reads as a plausible number all the way to the gateway.
+ *
+ * So the exceptions are enumerated EXHAUSTIVELY (all 0-, 3- and 4-decimal
+ * codes), leaving the `?? 100` fallback reachable only by a code that is not a
+ * real ISO 4217 currency — a typo, a lowercased code, or a placeholder. The
+ * two-decimal entries below are redundant with the default and kept only as
+ * documentation of the common set.
  */
 export const MINOR_UNIT_FACTOR: Readonly<Record<string, number>> = {
   USD: 100,
@@ -64,13 +77,34 @@ export const MINOR_UNIT_FACTOR: Readonly<Record<string, number>> = {
   HKD: 100,
   THB: 100,
   IDR: 100,
+  // ── exponent 0 — no minor unit at all (ISO 4217 exhaustive) ──────────────
+  BIF: 1,
+  CLP: 1,
+  DJF: 1,
+  GNF: 1,
+  ISK: 1,
+  KMF: 1,
   KRW: 1,
+  PYG: 1,
+  RWF: 1,
+  UGX: 1,
+  UYI: 1,
   VND: 1,
+  VUV: 1,
+  XAF: 1,
+  XOF: 1,
+  XPF: 1,
+  // ── exponent 3 — millimes / fils (ISO 4217 exhaustive) ───────────────────
   BHD: 1000,
-  KWD: 1000,
+  IQD: 1000,
   JOD: 1000,
+  KWD: 1000,
+  LYD: 1000,
   OMR: 1000,
   TND: 1000,
+  // ── exponent 4 — indexed units (ISO 4217 exhaustive) ─────────────────────
+  CLF: 10_000,
+  UYW: 10_000,
 };
 
 /**
@@ -92,17 +126,86 @@ export function toCurrencyCode(value: string): CurrencyCode | null {
   return CURRENCY_PATTERN.test(value) ? (value as CurrencyCode) : null;
 }
 
+/**
+ * Validate + brand, or throw. The constructor form — same relationship to
+ * {@link toCurrencyCode} that `civilDate` has to `isCivilDate`.
+ *
+ * `Money` carries a {@link CurrencyCode}, not a bare string, and this is where
+ * an untrusted value earns the brand. Rejecting `'jpy'` here matters: lowercase
+ * misses {@link MINOR_UNIT_FACTOR}, so it silently becomes a 2-decimal currency
+ * and every JPY amount is off by 100×.
+ */
+export function currencyCode(value: string): CurrencyCode {
+  const code = toCurrencyCode(value);
+  if (code === null) {
+    throw new InvalidCurrencyCodeError(value);
+  }
+  return code;
+}
+
+export class InvalidCurrencyCodeError extends Error {
+  override readonly name = 'InvalidCurrencyCodeError';
+  readonly value: string;
+
+  constructor(value: string) {
+    super(
+      `Invalid ISO 4217 currency code '${value}' — expected three uppercase letters. ` +
+        'A code that misses the minor-unit table is assumed to have two decimals, which is a 100× error for JPY-style currencies.',
+    );
+    this.value = value;
+  }
+}
+
+/**
+ * Raised when an operation combines two currencies.
+ *
+ * Declared HERE rather than in `/money` so the FX seam below can throw it
+ * without a runtime import back into `/money` (which imports
+ * {@link minorUnitFactor} from this file). `/money` re-exports it, so
+ * `import { CurrencyMismatchError } from '@classytic/primitives/money'` still
+ * resolves.
+ */
+export class CurrencyMismatchError extends Error {
+  override readonly name = 'CurrencyMismatchError';
+  readonly left: string;
+  readonly right: string;
+
+  constructor(left: string, right: string) {
+    super(`Currency mismatch: ${left} vs ${right}`);
+    this.left = left;
+    this.right = right;
+  }
+}
+
 /** Type predicate for `unknown` input. */
 export function isCurrencyCode(value: unknown): value is CurrencyCode {
   return typeof value === 'string' && CURRENCY_PATTERN.test(value);
 }
 
 /**
- * Minor units per major unit (e.g. 100 for USD, 1 for JPY, 1000 for KWD).
- * Falls back to 100 when the currency is unknown — matches the ISO 4217 default.
+ * Minor units per major unit (100 for USD, 1 for JPY, 1000 for KWD, 10 000 for CLF).
+ *
+ * Falls back to 100 for an unlisted code — the ISO 4217 default exponent. Because
+ * {@link MINOR_UNIT_FACTOR} enumerates every non-2-decimal currency, that fallback
+ * is now only reached by codes that are not ISO 4217 currencies at all; use
+ * {@link isKnownCurrency} at a config/boot boundary if you need to reject those
+ * rather than assume two decimals for them.
  */
 export function minorUnitFactor(currency: string): number {
   return MINOR_UNIT_FACTOR[currency] ?? 100;
+}
+
+/**
+ * Does {@link MINOR_UNIT_FACTOR} carry an explicit exponent for this code?
+ *
+ * `false` means {@link minorUnitFactor} would ASSUME two decimals. That
+ * assumption is right for an ordinary ISO 4217 code and wrong by 100× for a
+ * mistyped or lowercased one (`'jpy'`), so a boot-time config validator that
+ * accepts an operator-supplied currency should gate on this instead of letting
+ * the default answer for it.
+ */
+export function isKnownCurrency(currency: string): boolean {
+  return Object.hasOwn(MINOR_UNIT_FACTOR, currency);
 }
 
 /**
@@ -135,14 +238,57 @@ export interface FxSnapshot {
 }
 
 /**
- * Apply an {@link FxSnapshot} to a source-currency amount. Returns the
- * equivalent base-currency amount. No rounding — callers that persist into
- * an integer minor-unit column must round explicitly with a deterministic
- * rule (`Math.round`, banker's rounding, floor for duty-conservative
- * postings, etc.).
+ * How to land a converted amount on an integer number of minor units.
+ * Required to be deterministic and named, never implicit — the old signature
+ * returned an unrounded float and left the choice to whoever persisted it, so
+ * two call sites rounding differently produced two answers for one conversion.
  */
-export function convertWithSnapshot(sourceAmount: number, fx: FxSnapshot): number {
-  return sourceAmount * fx.rate;
+export type FxRounding = 'half-away-from-zero' | 'floor' | 'ceil';
+
+function roundMinor(raw: number, mode: FxRounding): number {
+  if (mode === 'floor') return Math.floor(raw);
+  if (mode === 'ceil') return Math.ceil(raw);
+  const sign = raw < 0 ? -1 : 1;
+  return Math.round(Math.abs(raw)) * sign;
+}
+
+/**
+ * Apply an {@link FxSnapshot} to a source-currency amount.
+ *
+ * ## Why this takes `Money` and not a number
+ *
+ * It used to take a bare `number`, which meant nothing could check the amount
+ * was denominated in `fx.sourceCurrency`. Applying a USD→BDT snapshot to a EUR
+ * amount type-checked, ran, and returned a plausible wrong number — the
+ * arithmetic is identical, only the meaning is wrong, so no test that asserts a
+ * total would notice. Taking `Money` lets the seam enforce its own
+ * precondition: a mismatch throws {@link CurrencyMismatchError}.
+ *
+ * ## Minor-unit exponents are handled
+ *
+ * The rate is quoted in MAJOR units (1 source = `rate` base), while `Money`
+ * holds minor units, and the two currencies need not share an exponent
+ * (USD has 2, JPY has 0). The conversion therefore goes
+ * `minor → major → ×rate → base minor`, not a naive `amount × rate`, which is
+ * off by 100× for any pair whose exponents differ.
+ */
+export function convertWithSnapshot(
+  source: Money,
+  fx: FxSnapshot,
+  options: { rounding?: FxRounding } = {},
+): Money {
+  if (source.currency !== fx.sourceCurrency) {
+    throw new CurrencyMismatchError(source.currency, fx.sourceCurrency);
+  }
+  if (!Number.isFinite(fx.rate)) {
+    throw new TypeError(`FxSnapshot.rate must be finite, got ${fx.rate}`);
+  }
+  const major = source.amount / minorUnitFactor(fx.sourceCurrency);
+  const raw = major * fx.rate * minorUnitFactor(fx.baseCurrency);
+  return {
+    amount: roundMinor(raw, options.rounding ?? 'half-away-from-zero'),
+    currency: currencyCode(fx.baseCurrency),
+  };
 }
 
 /**
@@ -151,10 +297,27 @@ export function convertWithSnapshot(sourceAmount: number, fx: FxSnapshot): numbe
  * currency". Not round-trip safe under rounding; prefer storing the
  * original source amount alongside the base amount when audit fidelity
  * matters.
+ *
+ * Symmetrically guarded: a base amount that is not in `fx.baseCurrency` throws
+ * rather than dividing by a rate that does not describe it.
  */
-export function reverseWithSnapshot(baseAmount: number, fx: FxSnapshot): number {
-  if (fx.rate === 0) throw new Error('FxSnapshot.rate must be non-zero');
-  return baseAmount / fx.rate;
+export function reverseWithSnapshot(
+  base: Money,
+  fx: FxSnapshot,
+  options: { rounding?: FxRounding } = {},
+): Money {
+  if (base.currency !== fx.baseCurrency) {
+    throw new CurrencyMismatchError(base.currency, fx.baseCurrency);
+  }
+  if (fx.rate === 0 || !Number.isFinite(fx.rate)) {
+    throw new TypeError(`FxSnapshot.rate must be a non-zero finite number, got ${fx.rate}`);
+  }
+  const major = base.amount / minorUnitFactor(fx.baseCurrency);
+  const raw = (major / fx.rate) * minorUnitFactor(fx.sourceCurrency);
+  return {
+    amount: roundMinor(raw, options.rounding ?? 'half-away-from-zero'),
+    currency: currencyCode(fx.sourceCurrency),
+  };
 }
 
 /**

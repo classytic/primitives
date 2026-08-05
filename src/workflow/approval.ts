@@ -105,7 +105,12 @@ export type ApprovalErrorCode =
    *  `approved` (still `pending`, or `rejected`). The single canonical
    *  "not yet approved" gate — hosts route it through arc-approval's
    *  `rethrowApprovalError` to the `approval.chain_incomplete` wire code. */
-  | 'CHAIN_INCOMPLETE';
+  | 'CHAIN_INCOMPLETE'
+  /** A finalize/commit was attempted with NO chain at all. Distinct from
+   *  `CHAIN_INCOMPLETE`: the chain is not unfinished, it is absent — the
+   *  document never carried one, or a schema that never declared the field
+   *  stripped it on write. See {@link assertApproved}. */
+  | 'CHAIN_MISSING';
 
 export class ApprovalError extends Error {
   override readonly name = 'ApprovalError';
@@ -295,22 +300,75 @@ export function isApproved(chain: ApprovalChain): boolean {
   return chain.status === 'approved';
 }
 
+export interface AssertApprovedOptions {
+  /** Override the thrown message. */
+  readonly message?: string;
+}
+
 /**
- * The canonical finalize-time gate: assert `chain` has reached `approved`,
- * else throw `ApprovalError('CHAIN_INCOMPLETE')`. Use this at every
- * commit/post/finalize boundary that must not proceed on an unapproved chain
- * (journal-entry post, PO approve, transfer dispatch, …) so they all raise the
- * SAME error instead of hand-rolling divergent codes. A `null`/absent chain is
- * treated as "no chain required" and passes — callers that require a chain
- * check presence separately.
+ * The canonical finalize-time gate: assert a chain EXISTS and has reached
+ * `approved`, else throw. Use it at every commit/post/finalize boundary that
+ * must not proceed unapproved (journal-entry post, PO approve, transfer
+ * dispatch, payment release) so they all raise the same two codes instead of
+ * hand-rolling divergent ones.
+ *
+ * ## Absence is not approval
+ *
+ * This function used to PASS on `null`/`undefined`, documented as "no chain
+ * required", with only prose telling callers to check presence separately. That
+ * is the permissive default with the widest blast radius: the gate reads as
+ * enforced at every call site while doing nothing for the one input most likely
+ * to occur by accident.
+ *
+ * And it occurs by accident routinely — a mongoose schema that never declared
+ * `approvalChain` **strips it on write**, so a document that carried a chain in
+ * memory reads back without one. The gate then passes, the money moves, and
+ * nothing anywhere says so. The flag has to survive the write; a gate that
+ * cannot tell "no approval configured" from "approval silently lost" must
+ * assume the dangerous one.
+ *
+ * A caller that genuinely permits an absent chain must say so by name —
+ * {@link assertApprovedIfPresent} — which is greppable in review, unlike a
+ * `null` that never got checked.
+ *
+ * @throws ApprovalError `CHAIN_MISSING` when `chain` is null/undefined.
+ * @throws ApprovalError `CHAIN_INCOMPLETE` when it exists but is not `approved`.
  */
-export function assertApproved(chain: ApprovalChain | null | undefined, message?: string): void {
-  if (chain != null && !isApproved(chain)) {
+export function assertApproved(
+  chain: ApprovalChain | null | undefined,
+  options: AssertApprovedOptions = {},
+): void {
+  if (chain == null) {
     throw new ApprovalError(
-      'CHAIN_INCOMPLETE',
-      message ?? `approval chain has not reached 'approved' (status='${chain.status}')`,
+      'CHAIN_MISSING',
+      options.message ??
+        'no approval chain present at a gate that requires one — an absent chain is not an approved one. ' +
+          'If this boundary legitimately runs without approval, call assertApprovedIfPresent() so the exemption is explicit.',
     );
   }
+  if (!isApproved(chain)) {
+    throw new ApprovalError(
+      'CHAIN_INCOMPLETE',
+      options.message ?? `approval chain has not reached 'approved' (status='${chain.status}')`,
+    );
+  }
+}
+
+/**
+ * The EXPLICIT opt-out: enforce the chain when one is present, allow the
+ * operation when none is.
+ *
+ * Only correct where "no chain" is a configured state the host can distinguish
+ * from a lost one — e.g. a policy engine that decided this document needs no
+ * approval and recorded that decision elsewhere. If you cannot tell the two
+ * apart, use {@link assertApproved}.
+ */
+export function assertApprovedIfPresent(
+  chain: ApprovalChain | null | undefined,
+  options: AssertApprovedOptions = {},
+): void {
+  if (chain == null) return;
+  assertApproved(chain, options);
 }
 
 export function isRejected(chain: ApprovalChain): boolean {

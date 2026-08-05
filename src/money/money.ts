@@ -1,5 +1,18 @@
 import type { CurrencyCode } from './currency.js';
-import { minorUnitFactor } from './currency.js';
+import {
+  CurrencyMismatchError,
+  currencyCode,
+  isCurrencyCode,
+  minorUnitFactor,
+} from './currency.js';
+
+/**
+ * Re-exported so `@classytic/primitives/money` remains the import site every
+ * consumer already uses. The class is DECLARED in `/currency` because the FX
+ * seam there throws it, and a runtime import from `/currency` back into
+ * `/money` would close an ESM cycle (`/money` imports `minorUnitFactor`).
+ */
+export { CurrencyMismatchError } from './currency.js';
 
 /**
  * Wire-format monetary amount: integer minor units, branded with a phantom
@@ -51,34 +64,37 @@ export function MinorUnits<C extends string = string>(
  *
  * Storing as integers avoids IEEE 754 rounding across arithmetic. Never store
  * `Money.amount` as a float.
+ *
+ * ## `currency` is a branded {@link CurrencyCode}, not a string
+ *
+ * It was declared `CurrencyCode | string`, and a union with `string` collapses
+ * TO `string` — so the brand was decoration on the one type in the package
+ * where it matters, and `money()` validated nothing. Any string reached the
+ * field: `'jpy'`, `''`, `'US Dollar'`, a mistyped `'BTD'`. None of those are in
+ * {@link MINOR_UNIT_FACTOR}, so `minorUnitFactor` assumes two decimals for them
+ * and every JPY-style amount is 100× wrong while looking perfectly ordinary.
+ *
+ * Construct through {@link money} / {@link fromMajor} (which validate and
+ * brand) or through `currencyCode()` at your own boundary. A raw object literal
+ * `{ amount, currency: someString }` is now a compile error — deliberately, so
+ * the validation cannot be bypassed by the shape that skipped it before.
  */
 export interface Money {
   readonly amount: number;
-  readonly currency: CurrencyCode | string;
-}
-
-export class CurrencyMismatchError extends Error {
-  override readonly name = 'CurrencyMismatchError';
-  readonly left: string;
-  readonly right: string;
-
-  constructor(left: string, right: string) {
-    super(`Currency mismatch: ${left} vs ${right}`);
-    this.left = left;
-    this.right = right;
-  }
+  readonly currency: CurrencyCode;
 }
 
 /**
  * Construct {@link Money} from an integer minor-unit amount.
  *
  * @throws TypeError if `amount` is not a finite integer.
+ * @throws InvalidCurrencyCodeError if `currency` is not ISO 4217 format.
  */
 export function money(amount: number, currency: string): Money {
   if (!Number.isFinite(amount) || !Number.isInteger(amount)) {
     throw new TypeError(`Money.amount must be a finite integer in minor units, got ${amount}`);
   }
-  return { amount, currency };
+  return { amount, currency: currencyCode(currency) };
 }
 
 /**
@@ -112,7 +128,7 @@ export function fromMajor(major: number, currency: string): Money {
   const cleaned = Number(raw.toPrecision(15));
   const sign = cleaned < 0 ? -1 : 1;
   const amount = Math.round(Math.abs(cleaned)) * sign;
-  return { amount, currency };
+  return { amount, currency: currencyCode(currency) };
 }
 
 /** Convert {@link Money} back to its major-unit floating-point representation. */
@@ -152,7 +168,10 @@ export function multiplyMoney(m: Money, scalar: number): Money {
 
 /** Sum a list of {@link Money}. Returns zero in the given currency for empty input. */
 export function sumMoney(values: readonly Money[], currency: string): Money {
-  return values.reduce<Money>((acc, v) => addMoney(acc, v), { amount: 0, currency });
+  return values.reduce<Money>((acc, v) => addMoney(acc, v), {
+    amount: 0,
+    currency: currencyCode(currency),
+  });
 }
 
 /** Strict equality (amount and currency both match). */
@@ -275,6 +294,9 @@ export function isMoney(value: unknown): value is Money {
     value !== null &&
     typeof (value as Money).amount === 'number' &&
     Number.isInteger((value as Money).amount) &&
-    typeof (value as Money).currency === 'string'
+    // Format-checked, not merely `typeof === 'string'`. The loose check
+    // accepted `{ amount: 1, currency: '' }` as valid Money, which is the shape
+    // a stripped or defaulted field arrives in.
+    isCurrencyCode((value as Money).currency)
   );
 }

@@ -143,7 +143,19 @@ export function listTimeZones(): readonly string[] {
 
 // ─── Offset resolution (the /calendar bridge) ───────────────────────────────
 
-const OFFSET_RE = /GMT(?:([+-])(\d{2}):(\d{2}))?/;
+/**
+ * ANCHORED on purpose.
+ *
+ * The unanchored form (`/GMT(?:([+-])(\d{2}):(\d{2}))?/`) made the offset group
+ * OPTIONAL *and* skippable: any label the runtime emits that this pattern cannot
+ * fully parse — `'GMT+5:30'` from an ICU build that does not zero-pad, or a
+ * locale that prefixes text — still matched the bare `GMT` alternative and
+ * resolved to offset **0**. A half-read offset became "UTC" with no error, which
+ * silently shifts every business-day boundary derived from it. Anchoring makes an
+ * unrecognised label throw instead; `\d{1,2}` accepts the unpadded variant rather
+ * than mis-reading it.
+ */
+const OFFSET_RE = /^GMT(?:([+-])(\d{1,2}):(\d{2}))?$/;
 
 /**
  * The zone's UTC offset AT `instant`, in minutes east of UTC — DST-exact.
@@ -308,13 +320,27 @@ export function civilDateOf(instant: Date, zone: string): CivilDate {
 export function civilDateToInstant(
   cd: CivilDate,
   zone: string,
-  time: { hour?: number; minute?: number } = {},
+  time: { hour?: number; minute?: number; second?: number; millisecond?: number } = {},
 ): Date {
   const m = CIVIL_RE.exec(cd);
   if (!m) throw new TimeZoneError(`Invalid civil date '${cd}'.`);
   const hour = time.hour ?? 0;
   const minute = time.minute ?? 0;
-  const wallAsUtc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), hour, minute);
+  // Seconds and milliseconds are offset-invariant for every zone in modern ICU
+  // data (offsets are whole minutes), so they pass straight through. They are
+  // accepted because a recurrence anchored at 09:30:15 must reproduce :15 —
+  // truncating to the minute silently drifts every occurrence.
+  const second = time.second ?? 0;
+  const millisecond = time.millisecond ?? 0;
+  const wallAsUtc = Date.UTC(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    hour,
+    minute,
+    second,
+    millisecond,
+  );
 
   const firstOffset = zoneOffsetMinutes(new Date(wallAsUtc), zone);
   let instantMs = wallAsUtc - firstOffset * MINUTE_MS;

@@ -10,6 +10,7 @@ import {
   reverseWithSnapshot,
   toCurrencyCode,
 } from '../../src/money/currency.js';
+import { money } from '../../src/money/money.js';
 
 describe('toCurrencyCode', () => {
   it('accepts any 3 uppercase letters', () => {
@@ -82,20 +83,27 @@ describe('FxSnapshot', () => {
     source: 'bangladesh-bank',
   };
 
-  it('convertWithSnapshot applies the rate', () => {
-    expect(convertWithSnapshot(10, usdBdt)).toBe(1100);
-    expect(convertWithSnapshot(0, usdBdt)).toBe(0);
-    expect(convertWithSnapshot(1.5, usdBdt)).toBe(165);
+  it('convertWithSnapshot applies the rate to a Money amount', () => {
+    // 10 USD (1000 cents) at 110 → 1100 BDT (110 000 paisa).
+    expect(convertWithSnapshot(money(1000, 'USD'), usdBdt)).toEqual({
+      amount: 110_000,
+      currency: 'BDT',
+    });
+    expect(convertWithSnapshot(money(0, 'USD'), usdBdt)).toEqual({ amount: 0, currency: 'BDT' });
+    expect(convertWithSnapshot(money(150, 'USD'), usdBdt)).toEqual({
+      amount: 16_500,
+      currency: 'BDT',
+    });
   });
 
   it('reverseWithSnapshot inverts (round-trip on exact rates)', () => {
-    const base = convertWithSnapshot(10, usdBdt);
-    expect(reverseWithSnapshot(base, usdBdt)).toBe(10);
+    const base = convertWithSnapshot(money(1000, 'USD'), usdBdt);
+    expect(reverseWithSnapshot(base, usdBdt)).toEqual({ amount: 1000, currency: 'USD' });
   });
 
   it('reverseWithSnapshot throws on zero rate', () => {
     const bad: FxSnapshot = { ...usdBdt, rate: 0 };
-    expect(() => reverseWithSnapshot(100, bad)).toThrow();
+    expect(() => reverseWithSnapshot(money(100, 'BDT'), bad)).toThrow();
   });
 
   it('isFxSnapshot accepts well-formed snapshots', () => {

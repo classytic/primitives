@@ -22,6 +22,7 @@
  */
 
 import type { Money } from '../money/money.js';
+import type { ProviderUnknownCause } from '../money/payment-gateway.js';
 import type { PaymentMethodKind } from '../money/payment-method-kind.js';
 
 /**
@@ -43,6 +44,19 @@ export const PAYMENT_EVENT_TYPE = {
   DISPUTE_WON: 'payment.dispute_won',
   DISPUTE_LOST: 'payment.dispute_lost',
   SETTLED: 'payment.settled',
+  /**
+   * The provider command produced NO observable outcome — timeout, abort,
+   * network fault, or a provider that holds no record and refuses to guess.
+   *
+   * This member exists because the port contract (`ProviderCommandResult` in
+   * `/payment-gateway`) is three-valued — `confirmed | declined | unknown` —
+   * while this catalogue was two-valued. An adapter that hit the third case had
+   * nowhere to publish it, so the only shapes on the bus were SUCCEEDED and
+   * FAILED, and an unobserved outcome had to be forced into one of them.
+   * Forcing it into FAILED is the one that double-charges: it licenses a retry
+   * for a command that may already have moved money.
+   */
+  UNKNOWN: 'payment.unknown',
 } as const satisfies Record<string, string>;
 
 export type PaymentEventType = (typeof PAYMENT_EVENT_TYPE)[keyof typeof PAYMENT_EVENT_TYPE];
@@ -54,6 +68,8 @@ export type PaymentEventType = (typeof PAYMENT_EVENT_TYPE)[keyof typeof PAYMENT_
  * "money in flight" not "money received".
  */
 export interface PaymentInitiatedPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.INITIATED;
   /** Stable payment identifier owned by the emitting package. */
   paymentId: string;
   /**
@@ -82,6 +98,8 @@ export interface PaymentInitiatedPayload {
  * downstream fulfilment unlocks.
  */
 export interface PaymentSucceededPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.SUCCEEDED;
   paymentId: string;
   providerRef?: string;
   providerCode: string;
@@ -99,6 +117,8 @@ export interface PaymentSucceededPayload {
  * overdue.
  */
 export interface PaymentFailedPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.FAILED;
   paymentId: string;
   providerRef?: string;
   providerCode: string;
@@ -120,6 +140,8 @@ export interface PaymentFailedPayload {
  * itself (pre- or post-clearing, often due to operator error).
  */
 export interface PaymentRefundedPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.REFUNDED;
   paymentId: string;
   /** Refund identifier (separate from `paymentId`). */
   refundId: string;
@@ -144,6 +166,8 @@ export interface PaymentRefundedPayload {
  * state.
  */
 export interface PaymentReversedPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.REVERSED;
   paymentId: string;
   providerRef?: string;
   providerCode: string;
@@ -165,6 +189,8 @@ export interface PaymentReversedPayload {
  * ledger bridges and closes the audit loop.
  */
 export interface PaymentReconciledPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.RECONCILED;
   /** Allocation identifier — NOT the payment id (a payment can have many). */
   allocationId: string;
   paymentId: string;
@@ -186,6 +212,8 @@ export interface PaymentReconciledPayload {
  * "hold" from "settle"; consumers should NOT treat this as cleared funds.
  */
 export interface PaymentAuthorizedPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.AUTHORIZED;
   paymentId: string;
   providerRef?: string;
   providerCode: string;
@@ -204,6 +232,8 @@ export interface PaymentAuthorizedPayload {
  * Pairs with {@link PaymentAuthorizedPayload} for two-phase flows.
  */
 export interface PaymentCapturedPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.CAPTURED;
   paymentId: string;
   providerRef?: string;
   providerCode: string;
@@ -223,6 +253,8 @@ export interface PaymentCapturedPayload {
  * Authorisation hold released — uncaptured auth voided before settlement.
  */
 export interface PaymentAuthVoidedPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.AUTH_VOIDED;
   paymentId: string;
   providerRef?: string;
   providerCode: string;
@@ -238,6 +270,8 @@ export interface PaymentAuthVoidedPayload {
  * payment. The merchant typically has a deadline to submit evidence.
  */
 export interface PaymentDisputedPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.DISPUTED;
   paymentId: string;
   /** Provider's dispute / chargeback id. */
   disputeId: string;
@@ -257,6 +291,8 @@ export interface PaymentDisputedPayload {
 
 /** Dispute resolved in merchant's favour — funds restored. */
 export interface PaymentDisputeWonPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.DISPUTE_WON;
   paymentId: string;
   disputeId: string;
   providerRef?: string;
@@ -269,6 +305,8 @@ export interface PaymentDisputeWonPayload {
 
 /** Dispute resolved against merchant — funds permanently lost plus fee. */
 export interface PaymentDisputeLostPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.DISPUTE_LOST;
   paymentId: string;
   disputeId: string;
   providerRef?: string;
@@ -287,6 +325,8 @@ export interface PaymentDisputeLostPayload {
  * reconciliation in country-aware ledger bridges.
  */
 export interface PaymentSettledPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.SETTLED;
   paymentId: string;
   providerRef?: string;
   providerCode: string;
@@ -302,7 +342,54 @@ export interface PaymentSettledPayload {
   metadata?: Record<string, unknown>;
 }
 
-/** Union of all payment event payload types — convenient for exhaustive switches. */
+/**
+ * The provider command produced no observable outcome. **This is not a
+ * failure**, and it is not a success — it is the absence of an answer.
+ *
+ * The obligation's state is genuinely unknown: the capture may have landed at
+ * the gateway with the acknowledgement lost in transit. The ONLY correct
+ * reaction is to reconcile the payment's real status before acting. A blind
+ * retry is a double charge; marking it failed and releasing the order is a
+ * shipped-but-unpaid order. Both are silent.
+ *
+ * Consumers MUST NOT treat this as a terminal state. It is a prompt to go and
+ * find out, and it resolves later into `payment.succeeded` or `payment.failed`.
+ */
+export interface PaymentUnknownPayload {
+  /** Discriminant — narrows {@link PaymentEventPayload}. */
+  readonly eventType: typeof PAYMENT_EVENT_TYPE.UNKNOWN;
+  paymentId: string;
+  providerRef?: string;
+  providerCode: string;
+  /** Which command went unanswered — the retry policy differs per verb. */
+  operation: 'create_intent' | 'verify' | 'authorize' | 'capture' | 'refund' | 'void';
+  /** The amount at stake, when the command carried one. */
+  amount?: Money;
+  methodKind?: PaymentMethodKind;
+  methodCode?: string;
+  /**
+   * NORMALIZED reason the outcome was not observed — mirrors
+   * `ProviderUnknownCause` from `/payment-gateway`. Never a raw vendor error
+   * string: this value is persisted and displayed, and vendor errors embed
+   * request URLs, tokens and body fragments.
+   */
+  causeCode: ProviderUnknownCause;
+  /** The idempotency key the command carried — what reconciliation asks with. */
+  idempotencyKey?: string;
+  occurredAt: Date;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Union of all payment event payload types.
+ *
+ * DISCRIMINATED on `eventType`. Before the discriminant existed,
+ * `PaymentInitiatedPayload` and `PaymentSucceededPayload` were structurally
+ * IDENTICAL — so a handler typed for "funds received" accepted "money in
+ * flight" with no error anywhere, and TypeScript could not tell them apart even
+ * in principle. Structural identity between two events that mean opposite
+ * things is precisely where a nominal tag has to carry the meaning.
+ */
 export type PaymentEventPayload =
   | PaymentInitiatedPayload
   | PaymentSucceededPayload
@@ -316,4 +403,85 @@ export type PaymentEventPayload =
   | PaymentDisputedPayload
   | PaymentDisputeWonPayload
   | PaymentDisputeLostPayload
-  | PaymentSettledPayload;
+  | PaymentSettledPayload
+  | PaymentUnknownPayload;
+
+/** Event type → its payload. The lookup a typed publisher/handler pair needs. */
+export interface PaymentEventPayloadMap {
+  'payment.initiated': PaymentInitiatedPayload;
+  'payment.succeeded': PaymentSucceededPayload;
+  'payment.failed': PaymentFailedPayload;
+  'payment.refunded': PaymentRefundedPayload;
+  'payment.reversed': PaymentReversedPayload;
+  'payment.reconciled': PaymentReconciledPayload;
+  'payment.authorized': PaymentAuthorizedPayload;
+  'payment.captured': PaymentCapturedPayload;
+  'payment.auth_voided': PaymentAuthVoidedPayload;
+  'payment.disputed': PaymentDisputedPayload;
+  'payment.dispute_won': PaymentDisputeWonPayload;
+  'payment.dispute_lost': PaymentDisputeLostPayload;
+  'payment.settled': PaymentSettledPayload;
+  'payment.unknown': PaymentUnknownPayload;
+}
+
+// ── Drift guards — compile-time, and they FAIL the build when violated ──────
+//
+// A map like the one above is exactly the kind of declared-but-unenforced
+// alignment that rots: add a member to PAYMENT_EVENT_TYPE, forget the map
+// entry, and every runtime path still works while the type lookup silently
+// resolves to `never`. These three assertions make each of those a tsc error.
+
+type Assert<T extends true> = T;
+
+/** Every declared event type has a payload in the map. */
+type _EveryTypeMapped = Assert<
+  PaymentEventType extends keyof PaymentEventPayloadMap ? true : false
+>;
+
+/** The map declares no key that is not a real event type. */
+type _NoStrayMapKeys = Assert<keyof PaymentEventPayloadMap extends PaymentEventType ? true : false>;
+
+/** Each payload's own `eventType` literal matches the key it is filed under. */
+type _DiscriminantMatchesKey = Assert<
+  {
+    [K in keyof PaymentEventPayloadMap]: PaymentEventPayloadMap[K] extends { eventType: K }
+      ? true
+      : false;
+  }[keyof PaymentEventPayloadMap] extends true
+    ? true
+    : false
+>;
+
+// Reference the aliases so `noUnusedLocals` keeps them (they are the gate).
+export type PaymentEventContractGuards = [
+  _EveryTypeMapped,
+  _NoStrayMapKeys,
+  _DiscriminantMatchesKey,
+];
+
+/**
+ * Narrow a payload by event type at RUNTIME, with the compile-time narrowing
+ * to match. `if (isPaymentEvent(PAYMENT_EVENT_TYPE.SUCCEEDED, p)) { … }` —
+ * inside the branch `p` is `PaymentSucceededPayload` and cannot be an
+ * initiated payload, which is the whole point of the discriminant.
+ */
+export function isPaymentEvent<T extends PaymentEventType>(
+  type: T,
+  payload: PaymentEventPayload,
+): payload is PaymentEventPayloadMap[T] {
+  return payload.eventType === type;
+}
+
+/**
+ * Is this payload a CLEARED-FUNDS event?
+ *
+ * The named answer to the question that used to be answerable only by
+ * structural shape — and answered wrong, because `initiated` had the same
+ * shape. `captured` counts; `initiated`, `authorized` and `unknown` do not.
+ */
+export function isFundsReceived(payload: PaymentEventPayload): boolean {
+  return (
+    payload.eventType === PAYMENT_EVENT_TYPE.SUCCEEDED ||
+    payload.eventType === PAYMENT_EVENT_TYPE.CAPTURED
+  );
+}

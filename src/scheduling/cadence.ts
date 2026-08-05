@@ -21,6 +21,17 @@
  * // → 2026-03-15T00:00:00Z
  */
 
+import {
+  addCivilDays,
+  type CivilDate,
+  civilDate,
+  civilDateOf,
+  civilDateToInstant,
+  civilDaysBetween,
+  isValidTimeZone,
+  localTimeParts,
+} from './timezone.js';
+
 export type CadenceKind = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'cron';
 
 /** ISO weekday — 1=Mon … 7=Sun. Matches Temporal + ISO 8601. */
@@ -31,9 +42,23 @@ interface CadenceBase {
   readonly startAt: Date;
   readonly endAt?: Date;
   /**
-   * Optional timezone IANA name (e.g. `Asia/Dhaka`). Pure functions in this
-   * module operate on UTC Date values; the field is carried for the host to
-   * localize occurrences when displaying. Occurrence math here is UTC-based.
+   * IANA zone the recurrence's WALL CLOCK is anchored to (e.g. `Asia/Dhaka`).
+   * **Authoritative, not decorative.**
+   *
+   * When set, occurrence math runs on that zone's calendar: `dayOfMonth: 1`
+   * lands on local midnight-relative wall time of the local 1st, weekday
+   * filters read the local weekday, and daily steps advance local calendar
+   * days (23h or 25h across a DST transition, not a flat 24h).
+   *
+   * When ABSENT, everything is UTC — the right default for a schedule that
+   * genuinely has no locale.
+   *
+   * History worth keeping: this field used to be documented as display-only
+   * while `stepMonthly` / `stepYearly` read `getUTCMonth()` / `getUTCDate()`.
+   * With `timezone: 'Asia/Dhaka'` and `dayOfMonth: 1` that placed every
+   * occurrence on the UTC 1st — 06:00 on the local 1st, or with a midnight
+   * anchor, the local **2nd at 00:00**. The field said one thing and the math
+   * did another, and nothing failed. A field that lies is worse than no field.
    */
   readonly timezone?: string;
 }
@@ -84,6 +109,7 @@ export type CadenceErrorCode =
   | 'INVALID_DAYS_OF_WEEK'
   | 'INVALID_START_AT'
   | 'INVALID_END_AT'
+  | 'INVALID_TIMEZONE'
   | 'UNSUPPORTED_CRON';
 
 export class CadenceError extends Error {
@@ -112,6 +138,16 @@ export function validateCadence(c: Cadence): void {
   }
   if (c.endAt && c.endAt.getTime() < c.startAt.getTime()) {
     throw new CadenceError('INVALID_END_AT', 'endAt must be >= startAt');
+  }
+  // The zone drives the arithmetic, so a name this runtime cannot resolve must
+  // fail HERE — at validation, before storage. Falling back to UTC would place
+  // every occurrence on a different calendar than the operator configured, and
+  // the schedule would still look correct in the document.
+  if (c.timezone !== undefined && !isValidTimeZone(c.timezone)) {
+    throw new CadenceError(
+      'INVALID_TIMEZONE',
+      `timezone must be a valid IANA zone name (e.g. 'Asia/Dhaka'), got '${c.timezone}'`,
+    );
   }
 
   if (c.kind === 'weekly' && c.daysOfWeek) {
@@ -196,23 +232,186 @@ export function occurrencesBetween(cadence: Cadence, from: Date, to: Date, limit
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Step-forward per kind (pure UTC arithmetic)
+// Step-forward per kind
+//
+// Two arithmetics, selected by `cadence.timezone`:
+//   - absent  → UTC (unchanged; the right answer for a locale-free schedule)
+//   - present → that zone's wall clock, via /timezone's DST-exact civil-date
+//               round-trip
+//
+// Both live behind ONE dispatch so they cannot drift the way a "monthly is
+// zone-aware but daily isn't" split would.
 // ─────────────────────────────────────────────────────────────────────────
 
 function stepForward(cadence: Cadence, from: Date): Date | null {
+  const zone = cadence.timezone;
   switch (cadence.kind) {
     case 'daily':
-      return stepDaily(cadence, from);
+      return zone === undefined ? stepDaily(cadence, from) : stepDailyZoned(cadence, from, zone);
     case 'weekly':
-      return stepWeekly(cadence, from);
+      return zone === undefined ? stepWeekly(cadence, from) : stepWeeklyZoned(cadence, from, zone);
     case 'monthly':
-      return stepMonthly(cadence, from);
+      return zone === undefined
+        ? stepMonthly(cadence, from)
+        : stepMonthlyZoned(cadence, from, zone);
     case 'yearly':
-      return stepYearly(cadence, from);
+      return zone === undefined ? stepYearly(cadence, from) : stepYearlyZoned(cadence, from, zone);
     default:
       return null;
   }
 }
+
+// ─── Wall-clock (zoned) arithmetic ──────────────────────────────────────────
+
+interface WallClock {
+  readonly year: number;
+  /** 1-based. */
+  readonly month: number;
+  readonly day: number;
+  readonly hour: number;
+  readonly minute: number;
+  readonly second: number;
+  readonly millisecond: number;
+}
+
+/**
+ * The anchor's LOCAL wall clock. Seconds and milliseconds come straight from
+ * the instant because every modern IANA offset is a whole number of minutes —
+ * they are the same in every zone.
+ */
+function wallClockOf(instant: Date, zone: string): WallClock {
+  const cd = civilDateOf(instant, zone);
+  const { hour, minute } = localTimeParts(instant, zone);
+  return {
+    year: Number(cd.slice(0, 4)),
+    month: Number(cd.slice(5, 7)),
+    day: Number(cd.slice(8, 10)),
+    hour,
+    minute,
+    second: instant.getUTCSeconds(),
+    millisecond: instant.getUTCMilliseconds(),
+  };
+}
+
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+function civilOf(year: number, month: number, day: number): CivilDate {
+  return civilDate(`${String(year).padStart(4, '0')}-${pad2(month)}-${pad2(day)}`);
+}
+
+/** Bind a local calendar day + the anchor's local time-of-day to an instant. */
+function bindWall(cd: CivilDate, wall: WallClock, zone: string): Date {
+  return civilDateToInstant(cd, zone, {
+    hour: wall.hour,
+    minute: wall.minute,
+    second: wall.second,
+    millisecond: wall.millisecond,
+  });
+}
+
+/** Occurrences are anchor-local-date + n×interval LOCAL days, at the anchor's local time. */
+function stepDailyZoned(c: DailyCadence, from: Date, zone: string): Date {
+  const wall = wallClockOf(c.startAt, zone);
+  const anchorCd = civilOf(wall.year, wall.month, wall.day);
+  const elapsed = civilDaysBetween(anchorCd, civilDateOf(from, zone));
+  let n = Math.max(0, Math.floor(elapsed / c.interval) * c.interval);
+  // Converges in at most a couple of iterations; the cap only bounds a
+  // pathological input rather than letting it spin.
+  for (let i = 0; i < 1000; i++) {
+    const candidate = bindWall(addCivilDays(anchorCd, n), wall, zone);
+    if (candidate.getTime() > from.getTime()) return candidate;
+    n += c.interval;
+  }
+  return bindWall(addCivilDays(anchorCd, n), wall, zone);
+}
+
+/** ISO weekday of a civil date — zone-free, a calendar day has a determinate weekday. */
+function isoWeekdayOfCivil(cd: CivilDate): IsoWeekday {
+  const utc = Date.UTC(Number(cd.slice(0, 4)), Number(cd.slice(5, 7)) - 1, Number(cd.slice(8, 10)));
+  return (((new Date(utc).getUTCDay() + 6) % 7) + 1) as IsoWeekday;
+}
+
+function stepWeeklyZoned(c: WeeklyCadence, from: Date, zone: string): Date {
+  const wall = wallClockOf(c.startAt, zone);
+  const anchorCd = civilOf(wall.year, wall.month, wall.day);
+  const targetDays = c.daysOfWeek ?? [isoWeekdayOfCivil(anchorCd)];
+
+  let cursor = civilDateOf(from, zone);
+  const maxSteps = Math.max(60, c.interval * 14) + 2;
+  for (let i = 0; i < maxSteps; i++) {
+    if (targetDays.includes(isoWeekdayOfCivil(cursor))) {
+      const weeksSinceAnchor = Math.floor(civilDaysBetween(anchorCd, cursor) / 7);
+      if (weeksSinceAnchor >= 0 && weeksSinceAnchor % c.interval === 0) {
+        const candidate = bindWall(cursor, wall, zone);
+        if (candidate.getTime() > from.getTime()) return candidate;
+      }
+    }
+    cursor = addCivilDays(cursor, 1);
+  }
+  return bindWall(cursor, wall, zone);
+}
+
+function stepMonthlyZoned(c: MonthlyCadence, from: Date, zone: string): Date {
+  const wall = wallClockOf(c.startAt, zone);
+  let candYear = wall.year;
+  let candMonth = wall.month; // 1-based
+
+  // Jump straight to the last interval-aligned month at or before `from`'s LOCAL
+  // month, then walk. Walking from the anchor one interval at a time would make
+  // each call O(months since anchor) with two ICU offset lookups per step — fine
+  // for next month, a stall for a decade-old anchor. `floor` never overshoots, so
+  // the walk below still decides the answer.
+  const fromCd = civilDateOf(from, zone);
+  const monthsDiff =
+    (Number(fromCd.slice(0, 4)) - wall.year) * 12 + (Number(fromCd.slice(5, 7)) - wall.month);
+  if (monthsDiff > 0) {
+    const aligned = Math.floor(monthsDiff / c.interval) * c.interval;
+    const abs = candYear * 12 + (candMonth - 1) + aligned;
+    candYear = Math.floor(abs / 12);
+    candMonth = (abs % 12) + 1;
+  }
+
+  for (let i = 0; i < 1000; i++) {
+    const day = clampDayOfMonth(c.dayOfMonth, candYear, candMonth - 1);
+    const candidate = bindWall(civilOf(candYear, candMonth, day), wall, zone);
+    if (candidate.getTime() > from.getTime()) return candidate;
+    candMonth += c.interval;
+    while (candMonth > 12) {
+      candMonth -= 12;
+      candYear += 1;
+    }
+  }
+  return bindWall(
+    civilOf(candYear, candMonth, clampDayOfMonth(c.dayOfMonth, candYear, candMonth - 1)),
+    wall,
+    zone,
+  );
+}
+
+function stepYearlyZoned(c: YearlyCadence, from: Date, zone: string): Date {
+  const wall = wallClockOf(c.startAt, zone);
+  let candYear = wall.year;
+
+  // Same fast-forward as monthly, and for the same reason.
+  const yearsDiff = Number(civilDateOf(from, zone).slice(0, 4)) - wall.year;
+  if (yearsDiff > 0) {
+    candYear += Math.floor(yearsDiff / c.interval) * c.interval;
+  }
+
+  for (let i = 0; i < 1000; i++) {
+    const day = clampDayOfMonth(c.dayOfMonth, candYear, c.month - 1);
+    const candidate = bindWall(civilOf(candYear, c.month, day), wall, zone);
+    if (candidate.getTime() > from.getTime()) return candidate;
+    candYear += c.interval;
+  }
+  return bindWall(
+    civilOf(candYear, c.month, clampDayOfMonth(c.dayOfMonth, candYear, c.month - 1)),
+    wall,
+    zone,
+  );
+}
+
+// ─── UTC arithmetic (no zone configured) ────────────────────────────────────
 
 function stepDaily(c: DailyCadence, from: Date): Date {
   const start = c.startAt;

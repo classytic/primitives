@@ -258,6 +258,21 @@ export async function assertAndClaim<TDoc, TStatus extends string>(
   },
 ): Promise<TDoc | null> {
   const sources = Array.isArray(args.from) ? args.from : [args.from as TStatus];
+  /**
+   * An EMPTY source list must never reach `claim()`.
+   *
+   * `validSources(to)` returns `[]` for a status nothing transitions into, and
+   * the multi-source idiom in the docblock above (`from: machine.validSources(x)`)
+   * makes that easy to hit. With `[]` the assert loop below runs ZERO times — the
+   * domain check silently does not happen — and the CAS is then handed an empty
+   * allow-list. Mongo's `$in: []` matches nothing so today that fails closed and
+   * looks exactly like a race-loss (`null`), which is the wrong diagnosis; a kit
+   * that read an empty list as "no constraint" would fail OPEN and claim from any
+   * state at all. An empty allow-list must never mean "any".
+   */
+  if (sources.length === 0) {
+    throw new IllegalTransitionError(machine.name, id, '(none)', args.to);
+  }
   for (const from of sources) {
     machine.assertTransition(id, from, args.to);
   }

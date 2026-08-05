@@ -1,7 +1,7 @@
 {
   "name": "@classytic/primitives",
   "version": "0.20.0",
-  "description": "Framework-agnostic TypeScript primitives shared across Classytic packages \u2014 Money, events, pagination, tenant config, and other building blocks.",
+  "description": "Framework-agnostic TypeScript primitives shared across Classytic packages — Money, events, pagination, tenant config, and other building blocks.",
   "author": "Classytic",
   "license": "MIT",
   "homepage": "https://www.npmjs.com/package/@classytic/primitives",
@@ -89,6 +89,10 @@
       "types": "./dist/approval.d.mts",
       "default": "./dist/approval.mjs"
     },
+    "./idempotency": {
+      "types": "./dist/idempotency.d.mts",
+      "default": "./dist/idempotency.mjs"
+    },
     "./cadence": {
       "types": "./dist/cadence.d.mts",
       "default": "./dist/cadence.mjs"
@@ -108,6 +112,10 @@
     "./person": {
       "types": "./dist/person.d.mts",
       "default": "./dist/person.mjs"
+    },
+    "./person-parse": {
+      "types": "./dist/person-parse.d.mts",
+      "default": "./dist/person-parse.mjs"
     },
     "./identity-verification": {
       "types": "./dist/identity-verification.d.mts",

@@ -65,16 +65,17 @@ subpath imports only.
 | Subpath | Ships |
 |---|---|
 | `/money` | `Money`, `fromMajor`, `toMajor`, `addMoney`, `subtractMoney`, `multiplyMoney`, `sumMoney`, `equalsMoney`, `compareMoney`, `negateMoney`, `absMoney`, `isMoney`, `CurrencyMismatchError` |
-| `/currency` | `CurrencyCode` brand, `CURRENCIES`, `MINOR_UNIT_FACTOR`, `minorUnitFactor`, `toCurrencyCode`, `isCurrencyCode` |
+| `/currency` | `CurrencyCode` brand, `CURRENCIES`, `MINOR_UNIT_FACTOR`, `minorUnitFactor`, `isKnownCurrency`, `toCurrencyCode`, `currencyCode`, `isCurrencyCode`, `InvalidCurrencyCodeError`, `CurrencyMismatchError`, `FxSnapshot`, `convertWithSnapshot`, `reverseWithSnapshot`, `FxRounding` |
 | `/address` | `Address`, `ContactAddress`, `GeoPoint`, `GeoJsonPoint`, `toGeoJsonPoint`, `fromGeoJsonPoint` |
-| `/period` | `DateRange`, `Period`, `isDateRange`, `isWithin`, `rangeDurationMs` |
+| `/period` | `DateRange`, `Period`, `isDateRange`, `isWithin`, `rangeDurationMs`, `rangesOverlap`, `DateRangeError` — **plus timezone-aware resolution**: `resolvePeriod`, `resolveDay`, `resolveMonth`, `resolveQuarter`, `resolveYear`, `resolveDateSpan`, `dayStart`, `periodOf`, `parsePeriod`, `formatPeriod`, `granularityOf`, `periodTimeZone`, `inclusiveEnd`, `PeriodError` |
 | `/reference` | `ExternalRef`, `ObjectIdLike`, `IdLike`, `DocumentRef`, `idToString`, `isExternalRef` |
 | `/context` | `OperationContext`, `ActorRef` |
 | `/events` | `DomainEvent`, `EventMeta`, `EventHandler`, `EventLogger`, `EventTransport`, `DeadLetteredEvent`, `PublishManyResult`, `createEvent`, `createChildEvent`, `matchEventPattern` |
 | `/result` | `Result<T, E>`, `ok`, `err`, `isOk`, `isErr`, `mapResult`, `mapError`, `unwrap` |
 | `/brand` | `Brand<T, B>`, `Prettify`, `DeepPartial`, `DeepReadonly`, `RequireKeys`, `OptionalKeys`, `Nullable`, `KeysMatching`, `NonEmptyArray` |
 | `/split-allocation` | `allocate`, `isBalanced`, `SplitAllocationError`, `SplitMethod`, `SplitSubject`, `SplitPart`, `SplitResult` |
-| `/approval` | `createChain`, `applyDecision`, `skipStep`, `nextPendingStep`, `pendingSteps`, `isApproved`, `isRejected`, `isPending`, `decisionCount`, `ApprovalError`, `ApprovalChain`, `ApprovalStep`, `ApprovalDecision`, `Approver`, `ApprovalThreshold` |
+| `/idempotency` | `decideClaim`, `completeClaim`, `renewLease`, `identityKey`, `sameIdentity`, `fingerprintRequest`, `newLeaseToken`, `isLeaseExpired`, `holdsLease`, `isInFlight`, `DEFAULT_LEASE_MS`, `IdempotencyClaim`, `ClaimOutcome`, `ClaimResult`, `ClaimState`, `IdempotencyIdentity`, `IdempotencyError` |
+| `/approval` | `createChain`, `applyDecision`, `skipStep`, `nextPendingStep`, `pendingSteps`, `isApproved`, `assertApproved`, `assertApprovedIfPresent`, `isRejected`, `isPending`, `decisionCount`, `ApprovalError`, `ApprovalChain`, `ApprovalStep`, `ApprovalDecision`, `Approver`, `ApprovalThreshold` |
 | `/cadence` | `nextOccurrence`, `occurrencesBetween`, `validateCadence`, `CadenceError`, `Cadence`, `DailyCadence`, `WeeklyCadence`, `MonthlyCadence`, `YearlyCadence`, `CronCadence`, `IsoWeekday` |
 | `/hold` | `addHold`, `resolveHold`, `activeHolds`, `resolvedHolds`, `isOnHold`, `hasActiveHoldOfCode`, `HoldError`, `HoldReason`, `HoldActor` |
 | `/sla` | `breachedAt`, `remainingMs`, `elapsedMs`, `isBreached`, `consumedFraction`, `validateSLA`, `SLAError`, `SLA`, `BreachPolicy` |

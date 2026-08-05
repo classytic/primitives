@@ -316,6 +316,18 @@ export interface WebhookEvent {
  *
  * See `spine/docs/payments-architecture.md` §3.4.1 and phase 1.
  */
+
+/**
+ * How reconciliation asks a provider about a specific REFUND. The refund is identified
+ * by the original `paymentId` plus the refund's `idempotencyKey` (the value the provider
+ * deduped on); `refundRef` is the gateway refund id when the engine observed one.
+ */
+export interface RefundStatusQuery {
+  paymentId: string;
+  idempotencyKey: string;
+  refundRef?: string;
+}
+
 export interface PaymentProviderPort {
   /** Stable lowercase provider name — the registry key. */
   readonly name: string;
@@ -363,6 +375,17 @@ export interface PaymentProviderPort {
     command: PaymentCommandContext,
     options?: { reason?: string },
   ): Promise<RefundResult>;
+
+  /**
+   * Current status of a REFUND (not the payment). OPTIONAL and feature-detected: only
+   * a provider that can look a refund up implements it. Reconciliation MUST use this,
+   * never `getStatus` (which reports the PAYMENT) — asking the payment about a refund
+   * misclassifies a successful charge as a successful reversal. The query carries the
+   * original `paymentId` and the refund's `idempotencyKey` (and `refundRef` when we
+   * observed one) so the provider can find the specific reversal it deduped. A provider
+   * without this cannot be auto-reconciled — the engine then RETAINS the reservation.
+   */
+  getRefundStatus?(query: RefundStatusQuery, command?: PaymentCommandContext): Promise<PaymentResult>;
 
   handleWebhook(payload: unknown, headers?: Record<string, string>): Promise<WebhookEvent>;
 
@@ -416,8 +439,13 @@ export interface PaymentCommandContext {
   requestId: string;
   /** Our reference for the thing being paid for — order number, invoice number. */
   merchantReference: string;
-  /** Branch / tenant scope. */
-  organizationId: string;
+  /**
+   * Branch / tenant scope. OPTIONAL: a revenue engine can run unscoped
+   * (single-tenant / company-global), where there is no branch id to carry —
+   * so this is absent rather than an empty or asserted string. Scoped engines
+   * always set it; consumers that require scope must check, not cast.
+   */
+  organizationId?: string;
   /** Cancels an in-flight command (a cashier abandoning a terminal prompt, a shutdown). */
   signal?: AbortSignal;
 }

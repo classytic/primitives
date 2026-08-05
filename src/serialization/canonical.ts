@@ -68,6 +68,29 @@ function canonicalize(value: unknown, seen: WeakSet<object>): string {
     if (Array.isArray(value)) {
       return `[${value.map((v) => canonicalize(v, seen)).join(',')}]`;
     }
+    /**
+     * Reject CLASS INSTANCES — the silent-collapse hole.
+     *
+     * `Object.keys()` sees only own enumerable properties, so a `Types.ObjectId`,
+     * a `Buffer`, a `URL` or a hydrated Mongoose subdocument serializes as `{}`
+     * (or as a digit-keyed byte map). The digest then ignores the value entirely:
+     * two manifests referencing DIFFERENT documents hash identically, and the
+     * integrity check this module exists to provide reports "unchanged". That is
+     * the same failure mode the explicit `Date` branch above was written to
+     * prevent, so it gets the same treatment — an unsupported type FAILS.
+     *
+     * Callers holding ORM values project them to plain data first (see
+     * spine-accounting's `plainRef` / `plainSummary`); this makes that discipline
+     * enforced rather than remembered.
+     */
+    const proto = Object.getPrototypeOf(value) as object | null;
+    if (proto !== null && proto !== Object.prototype) {
+      const ctor = (value as { constructor?: { name?: string } }).constructor?.name ?? 'unknown';
+      throw new CanonicalizeError(
+        `class instance '${ctor}' is not serializable — its own enumerable keys are not its value, ` +
+          'so it would digest as {} and silently defeat the checksum. Project it to a plain object first.',
+      );
+    }
     const rec = value as Record<string, unknown>;
     const keys = Object.keys(rec).sort();
     return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalize(rec[k], seen)}`).join(',')}}`;
