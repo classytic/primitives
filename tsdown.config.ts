@@ -76,9 +76,13 @@ export default defineConfig({
     context: 'src/composition/context.ts',
     brand: 'src/composition/brand.ts',
     result: 'src/composition/result.ts',
+    environment: 'src/composition/environment.ts',
   },
   format: ['esm'],
   dts: { sourcemap: false },
+  // Manifest gate: 13 kernels shipped exports pointing at files that did not exist
+  // and built green. primitives is the most depended-upon package here.
+  publint: true,
   clean: true,
   sourcemap: false,
   treeshake: true,

@@ -3,6 +3,20 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-08-10
+
+### Added — `./environment`: canonical `NODE_ENV` classification
+
+`classifyEnv(raw)` — total function mapping a raw `NODE_ENV` string to `EnvClass = 'development' | 'test' | 'production'`. Every input yields exactly one bucket; no fourth state or `undefined`. Handles both spellings per bucket (`production`/`prod`, `test`/`qa`), trims whitespace (`.env` files and CI variables routinely carry trailing newlines), and defaults unknown values to `development` — the safe-fail direction that keeps local tooling functional.
+
+Collapses four copies across the codebase that each missed at least one spelling: `be-prod classifyEnv`, `gym businessMode()`, arc's CLI config template (`z.preprocess`), and arc's four raw comparison sites. The missed spellings were all in the dangerous direction — a `NODE_ENV=prod` instance that matched nothing fell through to `development`, opening security gates (`Secure` cookie flag, arc's dev preset, non-transactional money writes, raw 500 messages to the client) in production.
+
+Exports: `classifyEnv`, `EnvClass`, `isProduction`, `isDevelopment`, `isTest`.
+
+### Added — `publint` gate on build
+
+`publint: true` in `tsdown.config.ts` — catches export-map entries pointing at non-existent dist files at build time rather than at consumer install time.
+
 ## [0.20.0] - 2026-08-05
 
 ### Added — `./period` OWNS timezone-aware period resolution (was two copies above the kernels)

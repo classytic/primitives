@@ -89,6 +89,13 @@ const checks = [
   ['./money', 'CurrencyMismatchError'],
   ['./payment-events', 'isPaymentEvent'],
   ['./payment-events', 'isFundsReceived'],
+  // ─── 0.21.0 additions ────────────────────────────────────────────────
+  // The subpath sweep below already proves `./environment` IMPORTS; these prove the symbols
+  // survived the build. Both matter here: the whole point of this primitive is that four hosts
+  // and arc stop hand-rolling the classifier, so a tree-shaken export would send every one of
+  // them back to a raw `NODE_ENV === 'production'` comparison.
+  ['./environment', 'classifyEnv'],
+  ['./environment', 'isProductionEnv'],
 ];
 
 const failures = [];
