@@ -93,9 +93,7 @@ export function toMermaid<TStatus extends string>(
   for (const from of states) {
     for (const to of [...machine.validTargets(from)].sort()) {
       const label = labels[`${from}->${to}`];
-      lines.push(
-        `    ${safeId(from)} --> ${safeId(to)}${label !== undefined ? `: ${label}` : ''}`,
-      );
+      lines.push(`    ${safeId(from)} --> ${safeId(to)}${label !== undefined ? `: ${label}` : ''}`);
     }
   }
 

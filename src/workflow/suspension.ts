@@ -38,7 +38,7 @@
  */
 
 import { addMonths, startOfDay, type UtcOffsetMinutes } from '../scheduling/calendar.js';
-import { rangesOverlap, type DateRange } from '../scheduling/period.js';
+import { type DateRange, rangesOverlap } from '../scheduling/period.js';
 import type { StatusChangeEntry } from './status-history.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -179,10 +179,7 @@ export function suspendedDaysInPeriod(
 }
 
 /** Is any span still open at `at`? */
-export function openSpans(
-  history: readonly SuspensionSpan[],
-  at: Date,
-): readonly SuspensionSpan[] {
+export function openSpans(history: readonly SuspensionSpan[], at: Date): readonly SuspensionSpan[] {
   return history.filter(
     (s) => (s.endedAt ?? null) === null && s.startedAt.getTime() <= at.getTime(),
   );
@@ -310,7 +307,6 @@ export function dueForAutoResume(
   const due = span.autoResumeAt ?? null;
   return due !== null && due.getTime() <= at.getTime();
 }
-
 
 /**
  * Derive suspension spans from a status log — the seam that makes an allowance

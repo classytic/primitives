@@ -385,7 +385,10 @@ export interface PaymentProviderPort {
    * observed one) so the provider can find the specific reversal it deduped. A provider
    * without this cannot be auto-reconciled — the engine then RETAINS the reservation.
    */
-  getRefundStatus?(query: RefundStatusQuery, command?: PaymentCommandContext): Promise<PaymentResult>;
+  getRefundStatus?(
+    query: RefundStatusQuery,
+    command?: PaymentCommandContext,
+  ): Promise<PaymentResult>;
 
   handleWebhook(payload: unknown, headers?: Record<string, string>): Promise<WebhookEvent>;
 

@@ -417,6 +417,61 @@ export function resolvePeriod(period: Period, timezone?: string): DateRange {
  * For the `$lte` call sites that predate half-open ranges. Derived from the
  * resolved end rather than `start + 24h - 1`, so it stays DST-exact.
  */
+/**
+ * Shift a MONTH or QUARTER period by `n` of its own units (negative = back).
+ *
+ * The arithmetic a caller would otherwise write inline, and the reason this is
+ * here rather than in each of them: "two filing months ago" is a `Period`
+ * question, and the shapes reachable without it are both wrong in the same way.
+ *
+ *   `new Date(Date.UTC(y, m - 1 - n, 1))` — a UTC instant used to answer a
+ *   BUSINESS-calendar question. Six hours off in Asia/Dhaka at both ends; the
+ *   five silent defects in this module's header are all that shape.
+ *
+ *   hand-rolled integer math (`y * 12 + (m - 1) - n`) — correct, but it is a
+ *   third copy of a rule the `Period` type already owns, and the year rollover
+ *   is exactly where a copy goes wrong.
+ *
+ * NO Date is constructed and no zone is consulted: shifting a month is pure
+ * calendar arithmetic on `(year, month)`. The `timezone` rides along unchanged,
+ * so the shifted period still resolves against the calendar it was defined in —
+ * `resolvePeriod` / {@link resolveMonth} remain the only places instants appear.
+ *
+ * A YEAR period shifts by years; a `custom` (ad-hoc start/end) period has no
+ * unit to shift and throws rather than guessing one.
+ */
+export function shiftPeriod(period: Period, n: number): Period {
+  if (!Number.isInteger(n)) {
+    throw new PeriodError(
+      'INVALID_FIELD',
+      `shiftPeriod expects an integer offset, received ${String(n)}.`,
+    );
+  }
+  const granularity = granularityOf(period);
+  const zone = period.timezone !== undefined ? { timezone: period.timezone } : {};
+
+  if (granularity === 'month') {
+    // Zero-based month index makes the year rollover fall out of the division
+    // instead of needing a branch — `(m - 1)` in, `+ 1` out.
+    const zeroBased = period.year * 12 + ((period.month as number) - 1) + n;
+    return { year: Math.floor(zeroBased / 12), month: (zeroBased % 12) + 1, ...zone };
+  }
+  if (granularity === 'quarter') {
+    const zeroBased = period.year * 4 + ((period.quarter as number) - 1) + n;
+    return {
+      year: Math.floor(zeroBased / 4),
+      quarter: ((zeroBased % 4) + 1) as 1 | 2 | 3 | 4,
+      ...zone,
+    };
+  }
+  if (granularity === 'year') return { year: period.year + n, ...zone };
+
+  throw new PeriodError(
+    'AMBIGUOUS_PERIOD',
+    'shiftPeriod has no unit to shift for an ad-hoc start/end period — shift the instants, or use a calendar period.',
+  );
+}
+
 export function inclusiveEnd(range: DateRange): Date {
   assertUsableRange(range, 'range');
   return new Date(range.end.getTime() - 1);

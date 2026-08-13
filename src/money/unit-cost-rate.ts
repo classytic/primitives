@@ -132,7 +132,10 @@ export function unitCostRateFromTotal<C extends string = string>(
   currency: C,
 ): UnitCostRate<C> {
   if (!Number.isInteger(totalMinor)) {
-    throw new UnitCostRateError('NOT_INTEGER', `totalMinor must be integer minor units: ${totalMinor}`);
+    throw new UnitCostRateError(
+      'NOT_INTEGER',
+      `totalMinor must be integer minor units: ${totalMinor}`,
+    );
   }
   if (!Number.isFinite(quantity) || quantity <= 0) {
     throw new UnitCostRateError('NON_POSITIVE_QUANTITY', `quantity must be > 0, got ${quantity}`);
@@ -169,7 +172,10 @@ export function extendedAmount<C extends string = string>(
   const denominator = BigInt(rate.scale) * BigInt(QTY_SCALE);
   const minor = Number(roundedDiv(numerator, denominator, mode));
   if (!Number.isSafeInteger(minor)) {
-    throw new UnitCostRateError('UNSAFE_INTEGER', `extended amount ${minor} exceeds safe integer range`);
+    throw new UnitCostRateError(
+      'UNSAFE_INTEGER',
+      `extended amount ${minor} exceeds safe integer range`,
+    );
   }
   return toMinorUnits<C>(minor, rate.currency as C);
 }

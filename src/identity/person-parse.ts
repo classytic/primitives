@@ -80,7 +80,10 @@ export function looksLikeIdentifierNotName(value: string): boolean {
  * Prefers the email local-part (capitalised) so customers see a recognisable
  * label in the dashboard instead of "Unknown" or a leaked id.
  */
-export function fallbackNameFromUser(user: { name?: string; email?: string }, defaultLabel: string): string {
+export function fallbackNameFromUser(
+  user: { name?: string; email?: string },
+  defaultLabel: string,
+): string {
   const email = user.email?.trim();
   if (email?.includes('@')) {
     // `?? ''` because `split()[0]` is `string | undefined` under noUncheckedIndexedAccess.

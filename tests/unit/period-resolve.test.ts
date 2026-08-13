@@ -18,6 +18,7 @@ import {
   periodOf,
   periodTimeZone,
   resolveDateSpan,
+  shiftPeriod,
   resolveDay,
   resolveMonth,
   resolvePeriod,
@@ -303,5 +304,65 @@ describe('granularityOf / periodTimeZone / inclusiveEnd', () => {
     expect(inclusiveEnd(springForward).getTime()).not.toBe(
       springForward.start.getTime() + 86_400_000 - 1,
     );
+  });
+});
+
+/**
+ * Period ARITHMETIC — `shiftPeriod`.
+ *
+ * The rule these pin: shifting a calendar period is `(year, month)` math and
+ * must construct NO instant. Every assertion below uses a non-UTC zone, so a
+ * reimplementation that reached for `Date.UTC` to do the rollover would resolve
+ * to different instants and fail here rather than six hours later in a filing.
+ */
+describe('shiftPeriod', () => {
+  const DHAKA = 'Asia/Dhaka';
+
+  it('shifts months back across a year boundary', () => {
+    expect(shiftPeriod({ year: 2026, month: 1, timezone: DHAKA }, -2)).toEqual({
+      year: 2025,
+      month: 11,
+      timezone: DHAKA,
+    });
+  });
+
+  it('shifts months forward across a year boundary', () => {
+    expect(shiftPeriod({ year: 2026, month: 12, timezone: DHAKA }, 1)).toEqual({
+      year: 2027,
+      month: 1,
+      timezone: DHAKA,
+    });
+  });
+
+  it('is a no-op at zero and reversible', () => {
+    const p = { year: 2026, month: 8, timezone: DHAKA };
+    expect(shiftPeriod(p, 0)).toEqual(p);
+    expect(shiftPeriod(shiftPeriod(p, -5), 5)).toEqual(p);
+  });
+
+  it('CARRIES the zone, so the shifted period resolves against the same calendar', () => {
+    const shifted = shiftPeriod({ year: 2026, month: 8, timezone: DHAKA }, -2);
+    // Asia/Dhaka is UTC+6 — June starts at 18:00 UTC on 31 May, not 00:00 on 1 June.
+    // A shift that dropped the zone would resolve to the UTC month here.
+    expect(resolvePeriod(shifted).start.toISOString()).toBe('2026-05-31T18:00:00.000Z');
+  });
+
+  it('shifts quarters and years by their own unit', () => {
+    expect(shiftPeriod({ year: 2026, quarter: 1, timezone: DHAKA }, -1)).toEqual({
+      year: 2025,
+      quarter: 4,
+      timezone: DHAKA,
+    });
+    expect(shiftPeriod({ year: 2026, timezone: DHAKA }, 3)).toEqual({ year: 2029, timezone: DHAKA });
+  });
+
+  it('REFUSES an ad-hoc period — there is no unit to shift', () => {
+    expect(() =>
+      shiftPeriod({ year: 2026, start: new Date('2026-01-01'), end: new Date('2026-02-01') }, 1),
+    ).toThrow(PeriodError);
+  });
+
+  it('refuses a non-integer offset rather than truncating it', () => {
+    expect(() => shiftPeriod({ year: 2026, month: 3, timezone: DHAKA }, 1.5)).toThrow(PeriodError);
   });
 });

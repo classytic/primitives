@@ -3,6 +3,20 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0] - 2026-08-12
+
+### Added — `./period`: `shiftPeriod(period, n)` — calendar arithmetic without instants
+
+Shift a MONTH or QUARTER period by `n` of its own units (negative = back); YEAR shifts by years; a `custom` (ad-hoc start/end) period has no unit to shift and throws rather than guessing one. No `Date` is constructed and no zone is consulted — shifting a month is pure `(year, month)` arithmetic, and the `timezone` rides along unchanged so the shifted period still resolves against the calendar it was defined in.
+
+Exists because both inline shapes callers reach for are wrong the same way: `new Date(Date.UTC(y, m - 1 - n, 1))` answers a business-calendar question with a UTC instant (six hours off at both ends in Asia/Dhaka — the bug class this module's header documents five instances of), and hand-rolled `y * 12 + (m - 1) - n` integer math is a third copy of a rule `Period` already owns, with the year rollover exactly where copies go wrong. First consumer: be-prod `business-date.ts` ("two filing months ago").
+
+**Versioning note:** this export briefly existed in a working copy labelled 0.21.0 after 0.21.0 had already been published without it — same version, different surface. 0.22.0 restores the invariant that a version number names exactly one contract; `>=0.22.0` is the correct floor for any consumer importing `shiftPeriod`.
+
+### Docs — `./environment` docblock refinement (no API change)
+
+The 0.21.0 entry below originally listed `isProduction` / `isDevelopment` / `isTest`; the published surface is `classifyEnv`, `EnvClass`, `isProductionEnv` only — `isProductionEnv` is deliberately the single predicate (consumers needing all three buckets build their own triple from `classifyEnv`). The entry below is corrected in place; runtime and declarations are byte-identical to published 0.21.0 apart from comments.
+
 ## [0.21.0] - 2026-08-10
 
 ### Added — `./environment`: canonical `NODE_ENV` classification
@@ -11,7 +25,7 @@ adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Collapses four copies across the codebase that each missed at least one spelling: `be-prod classifyEnv`, `gym businessMode()`, arc's CLI config template (`z.preprocess`), and arc's four raw comparison sites. The missed spellings were all in the dangerous direction — a `NODE_ENV=prod` instance that matched nothing fell through to `development`, opening security gates (`Secure` cookie flag, arc's dev preset, non-transactional money writes, raw 500 messages to the client) in production.
 
-Exports: `classifyEnv`, `EnvClass`, `isProduction`, `isDevelopment`, `isTest`.
+Exports: `classifyEnv`, `EnvClass`, `isProductionEnv`.
 
 ### Added — `publint` gate on build
 

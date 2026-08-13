@@ -56,13 +56,7 @@ export type MoneyByCurrency = Record<string, Money>;
  *   - `usage`        — metered / per-seat / consumption (billed per unit or in
  *                      arrears). The extension point for rating models.
  */
-export const MONETIZATION_KINDS = [
-  'free',
-  'one_time',
-  'subscription',
-  'bundle',
-  'usage',
-] as const;
+export const MONETIZATION_KINDS = ['free', 'one_time', 'subscription', 'bundle', 'usage'] as const;
 
 export type MonetizationKind = (typeof MONETIZATION_KINDS)[number];
 

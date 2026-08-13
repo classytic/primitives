@@ -87,24 +87,17 @@ export function classifyEnv(env: string | undefined | null): EnvClass {
 }
 
 /**
- * The three predicates, one per bucket.
+ * `true` when the value classifies as production.
  *
- * Named functions rather than a `classifyEnv(x) === 'production'` at each call site: a literal
+ * A named predicate rather than a `classifyEnv(x) === 'production'` at each call site: a literal
  * comparison against an env string is the exact shape that caused every defect listed above, so
  * this module should not contain one — even a correct one — for the next reader to copy.
  *
- * All three delegate to {@link classifyEnv}, so they cannot disagree with it or with each other,
- * and exactly one is true for any input. That mutual exclusivity is the property hosts rely on
- * when they build a `{ isDevelopment, isTest, isProduction }` triple.
+ * Deliberately the ONLY predicate. `isTest` / `isDevelopment` were added and removed the same day:
+ * they had zero importers, because consumers that need all three buckets build their own triple
+ * from `classifyEnv` (be-prod's `config.*`, gym's `businessMode()`). Speculative surface on a
+ * published package is not free — it has to be supported, and it invited a needless version bump.
  */
-export function isProduction(env: string | undefined | null): boolean {
+export function isProductionEnv(env: string | undefined | null): boolean {
   return classifyEnv(env) === 'production';
-}
-
-export function isTest(env: string | undefined | null): boolean {
-  return classifyEnv(env) === 'test';
-}
-
-export function isDevelopment(env: string | undefined | null): boolean {
-  return classifyEnv(env) === 'development';
 }

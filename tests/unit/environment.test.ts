@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyEnv, isDevelopment, isProduction, isTest } from '../../src/composition/environment.js';
+import { classifyEnv, isProductionEnv } from '../../src/composition/environment.js';
 
 /**
  * The invariants that matter are NOT "classifyEnv('production') === 'production'".
@@ -79,12 +79,12 @@ describe('classifyEnv', () => {
   });
 });
 
-describe('the three predicates', () => {
+describe('isProductionEnv', () => {
   it('agrees with classifyEnv for every case in the table', () => {
     // The two must never disagree: callers mix them freely, and a divergence would mean two
     // answers to one question — the exact condition this module was created to remove.
     for (const [input] of CASES) {
-      expect(isProduction(input)).toBe(classifyEnv(input) === 'production');
+      expect(isProductionEnv(input)).toBe(classifyEnv(input) === 'production');
     }
   });
 
@@ -93,41 +93,10 @@ describe('the three predicates', () => {
      * Call sites overwhelmingly write `!isProduction`. These are the inputs where a hand-rolled
      * check got it wrong, so they are asserted directly rather than left implicit in the table.
      */
-    expect(isProduction('prod')).toBe(true);
-    expect(isProduction('production')).toBe(true);
-    expect(isProduction('qa')).toBe(false);
-    expect(isProduction('staging')).toBe(false);
-    expect(isProduction(undefined)).toBe(false);
-  });
-
-  it('isTest covers BOTH test spellings', () => {
-    // `qa` is the one that silently vanished multi-boot support on QA runs.
-    expect(isTest('test')).toBe(true);
-    expect(isTest('qa')).toBe(true);
-    expect(isTest('QA')).toBe(true);
-    expect(isTest('production')).toBe(false);
-    expect(isTest(undefined)).toBe(false);
-  });
-
-  it('isDevelopment is the fallback bucket, including for unknown values', () => {
-    expect(isDevelopment('development')).toBe(true);
-    expect(isDevelopment('dev')).toBe(true);
-    expect(isDevelopment(undefined)).toBe(true);
-    expect(isDevelopment('staging')).toBe(true);
-    expect(isDevelopment('prod')).toBe(false);
-    expect(isDevelopment('qa')).toBe(false);
-  });
-
-  it('EXACTLY ONE is true for every input — the property hosts build a triple from', () => {
-    /**
-     * be-prod's `config.isProduction/isTest/isDevelopment` and gym's `businessMode()` both return
-     * all three together. If two could be true at once — or none — those triples would describe an
-     * environment that does not exist, and every gate reading one of them would disagree with a
-     * gate reading another.
-     */
-    for (const [input] of CASES) {
-      const trues = [isProduction(input), isTest(input), isDevelopment(input)].filter(Boolean);
-      expect(trues, `exactly one bucket for ${JSON.stringify(input)}`).toHaveLength(1);
-    }
+    expect(isProductionEnv('prod')).toBe(true);
+    expect(isProductionEnv('production')).toBe(true);
+    expect(isProductionEnv('qa')).toBe(false);
+    expect(isProductionEnv('staging')).toBe(false);
+    expect(isProductionEnv(undefined)).toBe(false);
   });
 });

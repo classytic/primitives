@@ -7,6 +7,7 @@
  * tests and single-process dev where durable persistence is noise.
  */
 
+import type { DeadLetteredEvent, DomainEvent } from './events.js';
 import {
   InvalidOutboxEventError,
   type OutboxAcknowledgeOptions,
@@ -17,14 +18,13 @@ import {
   type OutboxStatus,
   type OutboxStore,
   type OutboxWriteOptions,
-} from "./outbox.js";
-import type { DeadLetteredEvent, DomainEvent } from "./events.js";
+} from './outbox.js';
 
 const DEFAULT_LEASE_MS = 30_000;
 
 interface MemoryEntry {
   event: DomainEvent;
-  status: "pending" | "delivered" | "dead_letter";
+  status: 'pending' | 'delivered' | 'dead_letter';
   attempts: number;
   visibleAt: number;
   leaseOwner: string | null;
@@ -72,11 +72,11 @@ export class MemoryOutboxStore implements OutboxStore {
   }
 
   async save(event: DomainEvent, options?: OutboxWriteOptions): Promise<void> {
-    if (!event?.type || typeof event.type !== "string") {
-      throw new InvalidOutboxEventError("event.type is required");
+    if (!event?.type || typeof event.type !== 'string') {
+      throw new InvalidOutboxEventError('event.type is required');
     }
-    if (!event.meta?.id || typeof event.meta.id !== "string") {
-      throw new InvalidOutboxEventError("event.meta.id is required");
+    if (!event.meta?.id || typeof event.meta.id !== 'string') {
+      throw new InvalidOutboxEventError('event.meta.id is required');
     }
     if (options?.dedupeKey) {
       if (this.seenDedupeKeys.has(options.dedupeKey)) return;
@@ -85,7 +85,7 @@ export class MemoryOutboxStore implements OutboxStore {
     this.entries.push({
       createdAt: Date.now(),
       event,
-      status: "pending",
+      status: 'pending',
       attempts: 0,
       visibleAt: options?.visibleAt?.getTime() ?? 0,
       leaseOwner: null,
@@ -103,7 +103,7 @@ export class MemoryOutboxStore implements OutboxStore {
     return this.entries
       .filter(
         (e) =>
-          e.status === "pending" &&
+          e.status === 'pending' &&
           e.visibleAt <= now &&
           (e.leaseOwner === null || e.leaseExpiresAt <= now),
       )
@@ -115,13 +115,13 @@ export class MemoryOutboxStore implements OutboxStore {
     const now = Date.now();
     const limit = options?.limit ?? 100;
     const leaseMs = options?.leaseMs ?? DEFAULT_LEASE_MS;
-    const consumerId = options?.consumerId ?? "anonymous";
+    const consumerId = options?.consumerId ?? 'anonymous';
     const typeFilter = options?.types ? new Set(options.types) : null;
 
     const claimed: DomainEvent[] = [];
     for (const entry of this.entries) {
       if (claimed.length >= limit) break;
-      if (entry.status !== "pending") continue;
+      if (entry.status !== 'pending') continue;
       if (entry.visibleAt > now) continue;
       if (entry.leaseOwner !== null && entry.leaseExpiresAt > now) continue;
       if (typeFilter && !typeFilter.has(entry.event.type)) continue;
@@ -137,11 +137,11 @@ export class MemoryOutboxStore implements OutboxStore {
   async acknowledge(eventId: string, options?: OutboxAcknowledgeOptions): Promise<void> {
     const entry = this.entries.find((e) => e.event.meta.id === eventId);
     if (!entry) return;
-    if (entry.status === "delivered") return;
+    if (entry.status === 'delivered') return;
     if (options?.consumerId && entry.leaseOwner && entry.leaseOwner !== options.consumerId) {
       throw new OutboxOwnershipError(eventId, options.consumerId, entry.leaseOwner);
     }
-    entry.status = "delivered";
+    entry.status = 'delivered';
     entry.deliveredAt = Date.now();
     entry.leaseOwner = null;
   }
@@ -159,10 +159,10 @@ export class MemoryOutboxStore implements OutboxStore {
     if (entry.firstFailedAt === null) entry.firstFailedAt = now;
     entry.lastFailedAt = now;
     if (options?.deadLetter) {
-      entry.status = "dead_letter";
+      entry.status = 'dead_letter';
       return;
     }
-    entry.status = "pending";
+    entry.status = 'pending';
     entry.visibleAt = options?.retryAt ? options.retryAt.getTime() : 0;
   }
 
@@ -170,11 +170,11 @@ export class MemoryOutboxStore implements OutboxStore {
     const out: DeadLetteredEvent[] = [];
     for (const entry of this.entries) {
       if (out.length >= limit) break;
-      if (entry.status !== "dead_letter") continue;
+      if (entry.status !== 'dead_letter') continue;
       out.push({
         event: entry.event,
         error: {
-          message: entry.lastError?.message ?? "unknown",
+          message: entry.lastError?.message ?? 'unknown',
           ...(entry.lastError?.code !== undefined ? { code: entry.lastError.code } : {}),
         },
         attempts: entry.attempts,
@@ -192,7 +192,7 @@ export class MemoryOutboxStore implements OutboxStore {
       const entry = this.entries[i];
       if (!entry) continue;
       if (
-        entry.status === "delivered" &&
+        entry.status === 'delivered' &&
         entry.deliveredAt !== null &&
         entry.deliveredAt < cutoff
       ) {
@@ -209,10 +209,10 @@ export class MemoryOutboxStore implements OutboxStore {
    */
   async requeue(eventId: string): Promise<boolean> {
     const entry = this.entries.find(
-      (e) => e.event.meta.id === eventId && e.status === "dead_letter",
+      (e) => e.event.meta.id === eventId && e.status === 'dead_letter',
     );
     if (!entry) return false;
-    entry.status = "pending";
+    entry.status = 'pending';
     entry.attempts = 0;
     entry.leaseOwner = null;
     entry.leaseExpiresAt = 0;
@@ -227,7 +227,7 @@ export class MemoryOutboxStore implements OutboxStore {
 
   /** Age of the oldest PENDING row — see `MemoryEntry.createdAt` for why not `visibleAt`. */
   async oldestPendingAgeMs(): Promise<number | null> {
-    const pending = this.entries.filter((e) => e.status === "pending");
+    const pending = this.entries.filter((e) => e.status === 'pending');
     if (pending.length === 0) return null;
     const oldest = Math.min(...pending.map((e) => e.createdAt));
     return Date.now() - oldest;

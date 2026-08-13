@@ -23,12 +23,7 @@
  * ```
  */
 
-import type {
-  DomainEvent,
-  EventHandler,
-  EventTransport,
-  PublishManyResult,
-} from './events.js';
+import type { DomainEvent, EventHandler, EventTransport, PublishManyResult } from './events.js';
 import { matchEventPattern } from './events.js';
 
 /** Minimal error-only logger — assignable from `console`, pino, fastify.log. */
@@ -199,4 +194,3 @@ export function createInProcessBus(options?: InProcessEventBusOptions): InProces
  *
  * This subpath is the in-process BUS. The outbox is its own subpath.
  */
-
