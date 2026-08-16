@@ -11,6 +11,7 @@ import type { DeadLetteredEvent, DomainEvent } from './events.js';
 import {
   InvalidOutboxEventError,
   type OutboxAcknowledgeOptions,
+  type OutboxClaimedEvent,
   type OutboxClaimOptions,
   type OutboxErrorInfo,
   type OutboxFailOptions,
@@ -28,6 +29,8 @@ interface MemoryEntry {
   attempts: number;
   visibleAt: number;
   leaseOwner: string | null;
+  /** Fencing token — one per claim epoch of this event. */
+  fenceToken?: number;
   leaseExpiresAt: number;
   deliveredAt: number | null;
   firstFailedAt: number | null;
@@ -112,13 +115,17 @@ export class MemoryOutboxStore implements OutboxStore {
   }
 
   async claimPending(options?: OutboxClaimOptions): Promise<DomainEvent[]> {
+    return (await this.claimPendingFenced(options)).map((c) => c.event);
+  }
+
+  async claimPendingFenced(options?: OutboxClaimOptions): Promise<OutboxClaimedEvent[]> {
     const now = Date.now();
     const limit = options?.limit ?? 100;
     const leaseMs = options?.leaseMs ?? DEFAULT_LEASE_MS;
     const consumerId = options?.consumerId ?? 'anonymous';
     const typeFilter = options?.types ? new Set(options.types) : null;
 
-    const claimed: DomainEvent[] = [];
+    const claimed: OutboxClaimedEvent[] = [];
     for (const entry of this.entries) {
       if (claimed.length >= limit) break;
       if (entry.status !== 'pending') continue;
@@ -129,7 +136,11 @@ export class MemoryOutboxStore implements OutboxStore {
       entry.leaseOwner = consumerId;
       entry.leaseExpiresAt = now + leaseMs;
       entry.attempts++;
-      claimed.push(entry.event);
+      // Fencing: one token per CLAIM EPOCH of this event — a takeover after
+      // lease expiry mints strictly greater, so the previous holder's token
+      // stops acknowledging. Minted by the store; a process cannot fence itself.
+      entry.fenceToken = (entry.fenceToken ?? 0) + 1;
+      claimed.push({ event: entry.event, fencingToken: entry.fenceToken });
     }
     return claimed;
   }
@@ -140,6 +151,13 @@ export class MemoryOutboxStore implements OutboxStore {
     if (entry.status === 'delivered') return;
     if (options?.consumerId && entry.leaseOwner && entry.leaseOwner !== options.consumerId) {
       throw new OutboxOwnershipError(eventId, options.consumerId, entry.leaseOwner);
+    }
+    if (options?.fencingToken !== undefined && options.fencingToken !== entry.fenceToken) {
+      throw new OutboxOwnershipError(
+        eventId,
+        `token ${options.fencingToken}`,
+        `token ${entry.fenceToken}`,
+      );
     }
     entry.status = 'delivered';
     entry.deliveredAt = Date.now();

@@ -3,7 +3,45 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2026-08-15
+
+### Added — `./approval`: `notRequiredChain(reason)` + `isNotRequired(chain)`
+
+The chain for a subject that needs **no** approval — zero steps, already resolved. The
+explicit, greppable answer to "the policy engine ran and decided this document does not
+require approval", which callers previously had no way to express.
+
+This states a conclusion the module already reached rather than inventing one:
+`computeChainStatus` folds an empty step list to `'approved'` — "nothing outstanding" is
+what approved MEANS here, and that fold predates this function. `createChain` still throws
+`EMPTY_STEPS`: building a ROUTING chain that routes nowhere is a different mistake and
+stays refused. The two are deliberately not interchangeable, so reaching "approved with no
+approvers" requires saying so by name.
+
+**Why a chain rather than leaving the field unset.** Absence is the one input that occurs
+by accident — a schema that never declared `approvals` strips it on write — and
+`assertApproved` must keep treating that as `CHAIN_MISSING`. A present zero-step chain is
+distinguishable from a lost chain (absent) *and* from a granted one (has steps and
+decisions), so existing gates keep working through `isApproved` alone. No consumer needs a
+second predicate, which is what would drift.
+
+`isNotRequired` tests the STRUCTURE (`steps.length === 0`), not the new
+`notRequiredReason` field: a subject schema that never declared that field drops it on
+write, so a predicate reading it would answer differently before and after the save. The
+reason is provenance for the audit trail only — pinned by a test that strips it and asserts
+the predicate is unmoved.
+
+**The hazard, stated in the docblock:** this makes `isApproved` true with no human
+decision. It is correct only where a policy engine ASKED and got "no policy applies" —
+never as a fallback for a lookup that failed or was never configured. First consumer:
+`@classytic/arc-approval` 0.4.0 `whenNoPolicy: 'not-required'`.
+
 ## [0.22.0] - 2026-08-12
+
+### Added — outbox fencing tokens (`claimPendingFenced`)
+
+- **`OutboxStore.claimPendingFenced?`** (additive, feature-detected — mirrors repo-core's `LockAdapter.tryAcquireFenced`): same atomic semantics as `claimPending`, returning `OutboxClaimedEvent { event, fencingToken }`. The token is minted by the STORE per claim epoch — a takeover after lease expiry mints STRICTLY GREATER, so a stale ex-holder's `acknowledge`/`fail` (now accepting `fencingToken?`) throws `OutboxOwnershipError`. This closes the overlap that consumer-id ownership checks narrow but cannot close: holder ids recur; epochs do not.
+- `MemoryOutboxStore` implements it; `claimPending` delegates to the fenced path (one claim implementation). Stale-ack rejection is mutation-proven.
 
 ### Added — `./period`: `shiftPeriod(period, n)` — calendar arithmetic without instants
 

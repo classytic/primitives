@@ -8,6 +8,7 @@ import {
   unitCostRate,
   UnitCostRateError,
   unitCostRateFromTotal,
+  weightedAverageScaledRate,
 } from '../../src/money/unit-cost-rate.js';
 
 describe('unitCostRate', () => {
@@ -103,6 +104,45 @@ describe('line totals reconcile to a document total', () => {
       { id: 'L3', weight: 400 },
     ], 'by-value');
     expect(freight.parts.reduce((a, p) => a + p.amount, 0)).toBe(1000);
+  });
+});
+
+describe('weightedAverageScaledRate', () => {
+  it('averages an incoming receipt into the on-hand rate (the WAC step)', () => {
+    // 10 units @ 100 paisa + 10 units @ 200 paisa → 150 paisa average
+    const oldRate = unitCostRate(100, 'BDT').scaledAmount;
+    const inRate = unitCostRate(200, 'BDT').scaledAmount;
+    expect(weightedAverageScaledRate(10, oldRate, 10, inRate)).toBe(
+      unitCostRate(150, 'BDT').scaledAmount,
+    );
+  });
+
+  it('weights by quantity, not per-receipt', () => {
+    // 90 @ 100 + 10 @ 200 → 110, NOT 150
+    const oldRate = unitCostRate(100, 'BDT').scaledAmount;
+    const inRate = unitCostRate(200, 'BDT').scaledAmount;
+    expect(weightedAverageScaledRate(90, oldRate, 10, inRate)).toBe(
+      unitCostRate(110, 'BDT').scaledAmount,
+    );
+  });
+
+  it('zero on-hand: the incoming rate RESETS the average', () => {
+    expect(weightedAverageScaledRate(0, 999_000_000, 5, 42_000_000)).toBe(42_000_000);
+  });
+
+  it('NEGATIVE on-hand contributes nothing — incoming rate resets, never swings', () => {
+    // Averaging against -5 would produce a rate no supplier ever charged.
+    expect(weightedAverageScaledRate(-5, 100_000_000, 10, 200_000_000)).toBe(200_000_000);
+  });
+
+  it('fractional quantities are honoured exactly', () => {
+    // 2.5 @ 100 + 2.5 @ 200 → 150
+    expect(weightedAverageScaledRate(2.5, 100_000_000, 2.5, 200_000_000)).toBe(150_000_000);
+  });
+
+  it('rejects a non-positive incoming quantity — an issue must not call this', () => {
+    expect(() => weightedAverageScaledRate(10, 100, 0, 200)).toThrow(UnitCostRateError);
+    expect(() => weightedAverageScaledRate(10, 100, -1, 200)).toThrow(UnitCostRateError);
   });
 });
 

@@ -180,6 +180,48 @@ export function extendedAmount<C extends string = string>(
   return toMinorUnits<C>(minor, rate.currency as C);
 }
 
+/**
+ * Incremental weighted-average of two scaled rates — the moving-average (WAC)
+ * receipt step:
+ *
+ *   newRate = (onHandQty × onHandRate + inQty × inRate) / (onHandQty + inQty)
+ *
+ * Both rates must share the same scale (ecosystem-wide {@link RATE_SCALE});
+ * the result is a scaled integer on that same scale. Bigint-exact with the
+ * quantity honoured to {@link QTY_SCALE} precision; rounds once, at the end.
+ *
+ * Degenerate-stock semantics (the moving-average standard): a zero or
+ * NEGATIVE on-hand contributes NOTHING to the average — the incoming rate
+ * RESETS the cost. Averaging against a negative quantity would let a
+ * catch-up receipt swing the rate arbitrarily far from any price ever paid.
+ * Outflows never call this function: an issue leaves the average unchanged.
+ */
+export function weightedAverageScaledRate(
+  onHandQuantity: number,
+  onHandScaledRate: number,
+  inQuantity: number,
+  inScaledRate: number,
+  mode: RoundingMode = DEFAULT_ROUNDING,
+): number {
+  if (!Number.isFinite(inQuantity) || inQuantity <= 0) {
+    throw new UnitCostRateError(
+      'NON_POSITIVE_QUANTITY',
+      `incoming quantity must be > 0, got ${inQuantity}`,
+    );
+  }
+  assertSafe(inScaledRate);
+  const oldQty = Number.isFinite(onHandQuantity) ? Math.max(onHandQuantity, 0) : 0;
+  if (oldQty === 0) return inScaledRate;
+  assertSafe(onHandScaledRate);
+
+  const oldQ = scaleQuantity(oldQty);
+  const inQ = scaleQuantity(inQuantity);
+  const numerator = oldQ * BigInt(onHandScaledRate) + inQ * BigInt(inScaledRate);
+  const scaled = Number(roundedDiv(numerator, oldQ + inQ, mode));
+  assertSafe(scaled);
+  return scaled;
+}
+
 /** The rate as a plain (fractional) minor-units-per-unit number — for display only. */
 export function rateMinorPerUnit(rate: UnitCostRate): number {
   return rate.scaledAmount / rate.scale;

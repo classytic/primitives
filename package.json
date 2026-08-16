@@ -1,6 +1,6 @@
 {
   "name": "@classytic/primitives",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "description": "Framework-agnostic TypeScript primitives shared across Classytic packages — Money, events, pagination, tenant config, and other building blocks.",
   "author": "Classytic",
   "license": "MIT",
@@ -45,6 +45,10 @@
       "types": "./dist/calendar.d.mts",
       "default": "./dist/calendar.mjs"
     },
+    "./calendar-facts": {
+      "types": "./dist/calendar-facts.d.mts",
+      "default": "./dist/calendar-facts.mjs"
+    },
     "./timezone": {
       "types": "./dist/timezone.d.mts",
       "default": "./dist/timezone.mjs"
@@ -52,6 +56,10 @@
     "./reference": {
       "types": "./dist/reference.d.mts",
       "default": "./dist/reference.mjs"
+    },
+    "./fault-attribution": {
+      "types": "./dist/fault-attribution.d.mts",
+      "default": "./dist/fault-attribution.mjs"
     },
     "./context": {
       "types": "./dist/context.d.mts",

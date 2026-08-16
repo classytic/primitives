@@ -44,6 +44,10 @@ export default defineConfig({
     // ─── scheduling ─────────────────────────────────────────────────────
     period: 'src/scheduling/period.ts',
     calendar: 'src/scheduling/calendar.ts',
+    // Attested dated FACTS (public holidays, employer closures) + the three-state lookup.
+    // Sibling of `calendar`/`sla-policy`, not a field on either: gazette authority and
+    // completeness are not schedule properties.
+    'calendar-facts': 'src/scheduling/calendar-facts.ts',
     timezone: 'src/scheduling/timezone.ts',
     cadence: 'src/scheduling/cadence.ts',
     sla: 'src/scheduling/sla.ts',
@@ -73,6 +77,7 @@ export default defineConfig({
     // ─── composition ────────────────────────────────────────────────────
     mixin: 'src/composition/mixin.ts',
     reference: 'src/composition/reference.ts',
+    'fault-attribution': 'src/composition/fault-attribution.ts',
     context: 'src/composition/context.ts',
     brand: 'src/composition/brand.ts',
     result: 'src/composition/result.ts',

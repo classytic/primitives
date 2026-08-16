@@ -82,16 +82,37 @@ export interface OutboxClaimOptions {
   readonly types?: readonly string[];
 }
 
+/**
+ * A claim result carrying the FENCING TOKEN — returned by
+ * {@link OutboxStore.claimPendingFenced}. The token is minted by the STORE
+ * per claim epoch of that event: a re-claim after lease expiry mints a
+ * STRICTLY GREATER token, so a stale ex-holder presenting its old token to
+ * `acknowledge`/`fail` is rejected — the overlap window ownership checks
+ * narrow but cannot close (holder ids recur; epochs do not).
+ */
+export interface OutboxClaimedEvent {
+  readonly event: DomainEvent;
+  readonly fencingToken: number;
+}
+
 /** Options for {@link OutboxStore.acknowledge}. */
 export interface OutboxAcknowledgeOptions {
   /** Worker identifier — stores may enforce "only owner can ack". */
   readonly consumerId?: string;
+  /**
+   * Fencing token from {@link OutboxStore.claimPendingFenced}. Stores that
+   * fence MUST throw {@link OutboxOwnershipError} when it is not the event's
+   * CURRENT claim token.
+   */
+  readonly fencingToken?: number;
 }
 
 /** Options for {@link OutboxStore.fail}. */
 export interface OutboxFailOptions {
   /** Worker identifier — stores may enforce "only owner can fail". */
   readonly consumerId?: string;
+  /** Fencing token — same contract as {@link OutboxAcknowledgeOptions.fencingToken}. */
+  readonly fencingToken?: number;
 
   /** Schedule retry for a later time (implements backoff). */
   readonly retryAt?: Date;
@@ -303,6 +324,14 @@ export interface OutboxStore {
    * prefers this over `getPending`.
    */
   claimPending?(options?: OutboxClaimOptions): Promise<DomainEvent[]>;
+
+  /**
+   * FENCED claim — same atomic semantics as `claimPending`, returning each
+   * event with a store-minted fencing token (see {@link OutboxClaimedEvent}).
+   * Additive and feature-detected, mirroring `LockAdapter.tryAcquireFenced`:
+   * a store that cannot mint monotonic per-event tokens omits this method.
+   */
+  claimPendingFenced?(options?: OutboxClaimOptions): Promise<OutboxClaimedEvent[]>;
 
   /**
    * Mark event as successfully relayed.

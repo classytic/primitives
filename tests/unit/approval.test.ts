@@ -10,6 +10,9 @@ import {
   isRejected,
   nextPendingStep,
   pendingSteps,
+  isNotRequired,
+  notRequiredChain,
+  assertApproved,
   skipStep,
 } from '../../src/workflow/approval.js';
 
@@ -346,5 +349,76 @@ describe('parallel chain with threshold skips — realistic scenario', () => {
     c = skipStep(c, 'cfo', 'amount 500 does not exceed 10000');
     c = applyDecision(c, { stepId: 'manager', approverId: 'mgr', decision: 'approved' });
     expect(isApproved(c)).toBe(true);
+  });
+});
+
+describe('notRequiredChain — "the policy engine ran and nothing applied"', () => {
+  it('is approved, so every existing gate passes unchanged', () => {
+    const c = notRequiredChain('refund below every threshold');
+    expect(c.status).toBe('approved');
+    expect(isApproved(c)).toBe(true);
+    expect(() => assertApproved(c)).not.toThrow();
+  });
+
+  it('is distinguishable from a GRANTED approval', () => {
+    expect(isNotRequired(notRequiredChain('below threshold'))).toBe(true);
+
+    let granted = makeSimpleChain();
+    granted = applyDecision(granted, {
+      stepId: 'sales',
+      approverId: 'rep1',
+      decision: 'approved',
+    });
+    granted = applyDecision(granted, {
+      stepId: 'finance',
+      approverId: 'cfo1',
+      decision: 'approved',
+    });
+    expect(isApproved(granted)).toBe(true);
+    // Both approved — but only one of them had nobody to ask.
+    expect(isNotRequired(granted)).toBe(false);
+  });
+
+  it('is distinguishable from a LOST chain: absence still fails loudly', () => {
+    // The whole reason this is a chain rather than leaving `approvals` unset.
+    expect(() => assertApproved(null)).toThrow();
+    expect(() => assertApproved(undefined)).toThrow();
+    expect(() => assertApproved(notRequiredChain('below threshold'))).not.toThrow();
+  });
+
+  it('records why, for the audit trail', () => {
+    expect(notRequiredChain('refund 1000 < 20000').notRequiredReason).toBe('refund 1000 < 20000');
+  });
+
+  it('cannot be decided — there is no step to decide', () => {
+    try {
+      applyDecision(notRequiredChain('below threshold'), {
+        stepId: 'anything',
+        approverId: 'someone',
+        decision: 'approved',
+      });
+      expect.unreachable('deciding a zero-step chain must throw');
+    } catch (e) {
+      expect((e as ApprovalError).code).toBe('UNKNOWN_STEP');
+    }
+  });
+
+  it('createChain still REFUSES an empty step list', () => {
+    // The two are not interchangeable: a routing chain that routes nowhere is
+    // still a mistake. Reaching "approved" requires saying so by name.
+    try {
+      createChain({ order: 'sequential', steps: [] });
+      expect.unreachable('createChain([]) must throw');
+    } catch (e) {
+      expect((e as ApprovalError).code).toBe('EMPTY_STEPS');
+    }
+  });
+
+  it('isNotRequired reads STRUCTURE, so a schema that drops the reason cannot flip it', () => {
+    // Mongoose strict mode strips a field the subject schema never declared.
+    const { notRequiredReason: _dropped, ...persisted } = notRequiredChain('below threshold');
+    expect(persisted.notRequiredReason).toBeUndefined();
+    expect(isNotRequired(persisted as ApprovalChain)).toBe(true);
+    expect(isApproved(persisted as ApprovalChain)).toBe(true);
   });
 });

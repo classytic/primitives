@@ -76,6 +76,14 @@ export interface ApprovalChain {
   readonly order: ChainOrder;
   readonly steps: readonly ApprovalStep[];
   readonly status: ApprovalStatus;
+  /**
+   * Provenance for a chain built by {@link notRequiredChain} — why no approval
+   * was needed. PROVENANCE ONLY: never branch on it. A subject schema that
+   * does not declare this field STRIPS it on write (Mongoose strict mode), so
+   * a predicate reading it would answer differently before and after the save.
+   * {@link isNotRequired} tests the structure instead, which no schema can drop.
+   */
+  readonly notRequiredReason?: string;
 }
 
 export interface CreateChainInput {
@@ -169,6 +177,50 @@ export function createChain(input: CreateChainInput): ApprovalChain {
   });
 
   return { order: input.order, steps, status: 'pending' };
+}
+
+/**
+ * The chain for a subject that needs NO approval — zero steps, already
+ * resolved. The explicit, greppable answer to "the policy engine ran and
+ * decided this document does not require approval."
+ *
+ * ## Why this is not a fabricated approval
+ *
+ * {@link computeChainStatus} already folds an empty step list to `'approved'`
+ * — "nothing is outstanding" is what approved MEANS to this primitive, and
+ * that fold predates this function. What {@link createChain} refuses
+ * (`EMPTY_STEPS`) is building a ROUTING chain that routes nowhere, which is a
+ * different mistake and stays refused. So this constructor states the same
+ * conclusion the fold reaches, under a name a reviewer can search for, rather
+ * than letting a caller reach it by handing `createChain` an empty array.
+ *
+ * ## Why a chain at all, instead of leaving `approvals` absent
+ *
+ * Because absence is the one input that occurs by accident. A schema that
+ * never declared the field strips it, a failed write leaves it unset — and
+ * {@link assertApproved} must keep treating that as CHAIN_MISSING. A present,
+ * zero-step chain is distinguishable from both a lost chain (absent) and a
+ * granted one (has steps and decisions), so every existing gate keeps working
+ * unchanged and no caller needs a second predicate beside `isApproved`.
+ *
+ * ## The hazard, stated plainly
+ *
+ * This makes {@link isApproved} true without a human deciding anything. It is
+ * only correct where a policy engine ASKED and got "no policy applies" — never
+ * as a fallback for a lookup that failed, errored, or was not configured. A
+ * resolver that cannot reach its policy store must throw; answering "not
+ * required" there would auto-approve every document in the deployment, which
+ * is precisely the permissive-default failure this codebase designs against.
+ *
+ * @param reason Why approval was not required, for the audit trail.
+ */
+export function notRequiredChain(reason: string): ApprovalChain {
+  return {
+    order: 'sequential',
+    steps: [],
+    status: computeChainStatus([]),
+    notRequiredReason: reason,
+  };
 }
 
 /**
@@ -298,6 +350,23 @@ export function skipStep(chain: ApprovalChain, stepId: string, reason?: string):
 
 export function isApproved(chain: ApprovalChain): boolean {
   return chain.status === 'approved';
+}
+
+/**
+ * Was this chain built by {@link notRequiredChain} — i.e. approval did not
+ * apply, as opposed to having been granted?
+ *
+ * Both are `isApproved`, and for GATING that is correct: neither blocks the
+ * operation. Use this only where the difference is worth showing — an audit
+ * trail or an approvals UI, where rendering "Approved" for a document nobody
+ * approved misleads the reader.
+ *
+ * Tests the STRUCTURE (no steps ⇒ nobody was ever asked), not
+ * `notRequiredReason`, which a subject schema that never declared the field
+ * silently drops on write.
+ */
+export function isNotRequired(chain: ApprovalChain): boolean {
+  return chain.steps.length === 0;
 }
 
 export interface AssertApprovedOptions {

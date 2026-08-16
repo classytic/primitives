@@ -8,17 +8,16 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { createInProcessBus, InProcessEventBus } from '../../src/events/event-infra.js';
+import { createEvent, createScopedEvent, scopedEventMeta } from '../../src/events/events.js';
 // One import path for the store — `/event-infra` is the bus subpath and no
 // longer re-exports it (see the note at the foot of `src/events/event-infra.ts`).
 import { MemoryOutboxStore } from '../../src/events/memory-outbox.js';
-import { createEvent, createScopedEvent, scopedEventMeta } from '../../src/events/events.js';
+import { OutboxOwnershipError } from '../../src/events/outbox.js';
 
 describe('InProcessEventBus', () => {
   it('defaults name to "in-process"; accepts a custom name', () => {
     expect(new InProcessEventBus().name).toBe('in-process');
-    expect(new InProcessEventBus({ name: 'in-process-purchase' }).name).toBe(
-      'in-process-purchase',
-    );
+    expect(new InProcessEventBus({ name: 'in-process-purchase' }).name).toBe('in-process-purchase');
   });
 
   it('routes exact, dotted-glob, colon-glob, and star subscribers', async () => {
@@ -278,5 +277,42 @@ describe('scopedEventMeta / createScopedEvent', () => {
     expect(e.meta.resourceId).toBe('po_1');
     expect(typeof e.meta.id).toBe('string');
     expect(e.meta.timestamp).toBeInstanceOf(Date);
+  });
+});
+
+describe('outbox fencing tokens (claimPendingFenced)', () => {
+  const evt = (id: string) =>
+    ({ type: 'order.created', payload: {}, meta: { id, timestamp: new Date() } }) as never;
+
+  it('a takeover after lease expiry mints a STRICTLY GREATER token', async () => {
+    const store = new MemoryOutboxStore();
+    await store.save(evt('e1'));
+    const [a] = await store.claimPendingFenced!({ consumerId: 'old', leaseMs: 1 });
+    await new Promise((r) => setTimeout(r, 10));
+    const [b] = await store.claimPendingFenced!({ consumerId: 'new', leaseMs: 1_000 });
+    expect(b!.fencingToken).toBeGreaterThan(a!.fencingToken);
+  });
+
+  it("the STALE holder's ack is rejected — its token stopped acknowledging", async () => {
+    const store = new MemoryOutboxStore();
+    await store.save(evt('e2'));
+    const [a] = await store.claimPendingFenced!({ consumerId: 'old', leaseMs: 1 });
+    await new Promise((r) => setTimeout(r, 10));
+    await store.claimPendingFenced!({ consumerId: 'new', leaseMs: 1_000 });
+
+    await expect(store.acknowledge('e2', { fencingToken: a!.fencingToken })).rejects.toThrow(
+      OutboxOwnershipError,
+    );
+  });
+
+  it('the current token acknowledges; claimPending stays additive-compatible', async () => {
+    const store = new MemoryOutboxStore();
+    await store.save(evt('e3'));
+    const [c] = await store.claimPendingFenced!({ consumerId: 'w', leaseMs: 1_000 });
+    await store.acknowledge('e3', { fencingToken: c!.fencingToken });
+    // Bare claimPending still returns plain events (delegates to the fenced path).
+    await store.save(evt('e4'));
+    const plain = await store.claimPending!({ consumerId: 'w' });
+    expect(plain.map((e) => e.meta.id)).toContain('e4');
   });
 });
