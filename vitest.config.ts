@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config.js";
 
 export default defineConfig({
   test: {
@@ -7,8 +7,8 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          name: 'unit',
-          include: ['tests/unit/**/*.test.ts'],
+          name: "unit",
+          include: ["tests/unit/**/*.test.ts"],
           testTimeout: 10_000,
           hookTimeout: 10_000,
         },
@@ -16,18 +16,18 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          name: 'integration',
-          include: ['tests/integration/**/*.test.ts'],
+          name: "integration",
+          include: ["tests/integration/**/*.test.ts"],
           testTimeout: 30_000,
           hookTimeout: 30_000,
         },
       },
     ],
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'html'],
-      include: ['src/**/*.ts'],
-      exclude: ['src/index.ts'],
+      provider: "v8",
+      reporter: ["text", "html"],
+      include: ["src/**/*.ts"],
+      exclude: ["src/index.ts"],
     },
   },
 });

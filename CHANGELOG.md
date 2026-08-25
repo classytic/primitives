@@ -3,6 +3,16 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0] - 2026-08-24
+
+### Added — `@classytic/primitives/address`: capture-format system
+
+`AddressFormat`, `AddressFieldDescriptor`, `AddressFieldKey`, `PartialAddress`, `AddressFieldError` — a description of HOW a country collects a `ContactAddress`: field labels, order, requiredness, subdivision taxonomy hooks, and postal code pattern. Country packs (e.g. `@classytic/bd-areas/address-format`) live beside their taxonomies; this subpath owns only the generic shape.
+
+`validateAddress(address, format)` — validates a partial address against a format; returns `AddressFieldError[]`. Enforces `required` on both canonical and extension fields identically, and checks `postalCodePattern` only when a value is given and a pattern is declared. `isAddressValid` and `describeAddressError` are convenience wrappers.
+
+Every `key` in a descriptor is a field of `ContactAddress`; co-location with the value object is what makes a mismatch obvious instead of invisible.
+
 ## [0.23.0] - 2026-08-15
 
 ### Added — `./approval`: `notRequiredChain(reason)` + `isNotRequired(chain)`
