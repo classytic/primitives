@@ -3,6 +3,12 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.0] - 2026-08-24
+
+### Added
+
+- **`@classytic/primitives/item-identity` subpath** — `SkuFields`, `stockKeyOf`, `skuDisplay`. `sku` is a label; `skuRef` is the stock identity — the two fall back in opposite directions and getting one backwards type-checks while returning a plausible wrong string. `stockKeyOf` resolves `skuRef ?? sku ?? fallback` (the key to reserve, decrement and post against); `skuDisplay` resolves `skuLabel ?? sku ?? skuRef` (what a human reads). Canonicalises the per-package `variantSku || String(productId)` derivations into one place.
+
 ## [0.24.0] - 2026-08-24
 
 ### Added — `@classytic/primitives/address`: capture-format system

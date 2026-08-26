@@ -1,35 +1,19 @@
 /**
- * Transactional outbox contract — **this file is the canonical owner**
- * (0.13.0+). `@classytic/arc` imports and re-exports this contract; it no
- * longer maintains its own copy.
+ * Transactional outbox CONTRACT — the canonical owner. `@classytic/arc`
+ * re-exports this; it keeps no copy of its own.
  *
- * Ownership rule (settled 2026-07): primitives owns pure cross-package
- * CONTRACTS (events + outbox); arc owns the DURABLE runtime — the
- * `EventOutbox` relay, `MongoOutboxStore`, `repositoryAsOutboxStore`,
- * `exponentialBackoff`, and Fastify integration all live in
- * `@classytic/arc/events`. The dependency-free in-process REFERENCE runtime
- * (default kernel bus + `MemoryOutboxStore` for tests/dev) lives in
- * `@classytic/primitives/event-infra` — kernels can't dep arc, so the
- * shared fallback implementation lives here instead of being copy-pasted
- * per kernel.
+ * Contract surface only: {@link OutboxStore}, its option types, the
+ * {@link OutboxFailurePolicy} retry/DLQ contract, and the error classes.
  *
- * This module defines the contract surface only:
+ * The split exists because a domain package MUST NOT peer-dep arc. Owning the
+ * contract here lets a package write `implements OutboxStore` and hand the
+ * result to arc's `new EventOutbox({ store })`, and since arc re-exports these
+ * exact classes, `instanceof OutboxOwnershipError` works across the boundary.
  *
- *   - {@link OutboxStore} — persistence interface every store implements
- *   - Option types for `save` / `claimPending` / `acknowledge` / `fail`
- *   - {@link OutboxFailurePolicy} contract for retry / DLQ decisions
- *   - Error classes: {@link OutboxOwnershipError}, {@link InvalidOutboxEventError}
- *
- * Why the split:
- *
- *   Domain packages (cart, ledger, invoice, …) declare outbox stores
- *   (`CartOutboxRepository`, etc.) that implement this contract, so hosts
- *   can drop them straight into arc's `new EventOutbox({ store: cartOutbox })`.
- *   Packages MUST NOT peer-dep arc; they peer-dep primitives. Owning the
- *   contract here lets packages write `implements OutboxStore` without
- *   pulling arc into their dependency graph — and because arc re-exports
- *   these exact classes, `instanceof OutboxOwnershipError` works across the
- *   package boundary (arc's relay catches errors thrown by package stores).
+ * Runtimes live elsewhere: the DURABLE one (`EventOutbox` relay, Mongo store,
+ * backoff, Fastify wiring) in `@classytic/arc/events`; the dependency-free
+ * in-process reference (kernel bus + memory store, for tests/dev) in
+ * `@classytic/primitives/event-infra`.
  */
 
 import type { DeadLetteredEvent, DomainEvent } from './events.js';

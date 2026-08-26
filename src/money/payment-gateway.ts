@@ -1,57 +1,14 @@
 /**
- * Payment-gateway data shapes — the cross-package vocabulary every
- * gateway provider (Stripe, Razorpay, SSLCommerz, PayPal, bKash, Nagad,
- * manual cash, …) speaks when exchanging data with a payment engine.
+ * Payment-gateway data SHAPES — the vocabulary every provider (Stripe,
+ * SSLCommerz, bKash, manual cash, …) speaks to a payment engine.
  *
- * Anchored on `Money` from `@classytic/primitives/money` (integer minor
- * units, `number`). Same precision discipline as bank-transaction;
- * money never leaks into JS floats anywhere.
+ * Pure data interfaces only — zero runtime, zero classes, zero deps. The
+ * `PaymentProvider` contract and the repositories/state machines that consume
+ * these live in `@classytic/revenue`. That split is what lets a
+ * `revenue-stripe` package take `@classytic/primitives` as its ONLY peer.
  *
- * **What lives here:** pure data interfaces — `CreateIntentParams`,
- * `ProviderIntent`, `PaymentResult`, `RefundResult`, `WebhookEvent`,
- * `ProviderCapabilities`. Zero runtime, zero classes, zero deps.
- *
- * **What lives in `@classytic/revenue`:** the `PaymentProvider` abstract
- * class (the *contract* — what a gateway must implement), plus the
- * `TransactionRepository` and state machines that consume these shapes.
- *
- * **Why this separation matters.** A `revenue-stripe` package can
- * declare `@classytic/primitives` as its only peer dep — no mongoose,
- * no mongokit, no transaction-state-machine baggage. Same loose-
- * coupling story `@classytic/fin-io/adapters/revenue` already uses for
- * bank-feed providers: shapes in primitives, contracts in revenue,
- * implementations anywhere.
- *
- * @example A minimal Stripe provider
- * ```ts
- * import type {
- *   CreateIntentParams,
- *   ProviderIntent,
- *   PaymentResult,
- * } from '@classytic/primitives/payment-gateway';
- *
- * export class StripeProvider {
- *   readonly name = 'stripe';
- *
- *   async createIntent(params: CreateIntentParams): Promise<ProviderIntent> {
- *     const stripeIntent = await stripe.paymentIntents.create({
- *       amount: params.amount.amount,        // already integer minor units
- *       currency: params.amount.currency.toLowerCase(),
- *       metadata: params.metadata,
- *     });
- *     return {
- *       id: stripeIntent.id,
- *       provider: 'stripe',
- *       status: stripeIntent.status,
- *       amount: params.amount,
- *       paymentIntentId: stripeIntent.id,
- *       clientSecret: stripeIntent.client_secret ?? undefined,
- *       raw: stripeIntent,
- *     };
- *   }
- *   // verifyPayment, refund, handleWebhook, ...
- * }
- * ```
+ * Amounts are `Money` — integer minor units. Money never touches a JS float,
+ * so a provider passes `params.amount.amount` straight through with no ×100.
  */
 
 import type { Money } from './money.js';

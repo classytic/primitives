@@ -37,6 +37,7 @@ export default defineConfig({
     phone: 'src/identity/phone.ts',
     'identity-verification': 'src/identity/identity-verification.ts',
     otp: 'src/identity/otp.ts',
+    'item-identity': 'src/identity/item-identity.ts',
 
     // ─── serialization ──────────────────────────────────────────────────
     canonical: 'src/serialization/canonical.ts',

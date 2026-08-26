@@ -1,4 +1,9 @@
-import { defineConfig } from "vitest/config.js";
+// `vitest/config`, NOT `vitest/config.js` — a package SUBPATH is matched against
+// the exports map literally, and vitest publishes `./config` only. The trailing
+// `.js` (right for a relative ESM import, wrong here) made every run in this
+// package die at startup with ERR_MODULE_NOT_FOUND, which reads as a broken
+// install rather than a typo.
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
