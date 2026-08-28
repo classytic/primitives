@@ -67,6 +67,56 @@ export function isMonetizationKind(value: unknown): value is MonetizationKind {
   return typeof value === 'string' && MONETIZATION_KIND_SET.has(value as MonetizationKind);
 }
 
+/* ──────────────────────── upfront collection policy ─────────────────────── */
+
+/**
+ * HOW MUCH of a price is collected at the point of sale.
+ *
+ * Distinct from every neighbouring vocabulary, which is why it is its own:
+ *
+ *   - order's `PAYMENT_TERMS` (`prepaid` | `collect_on_delivery`) says WHEN.
+ *   - `PaymentAllocationStatus` (`partial`, `allocated`…) says how much of a
+ *     RECEIVED payment has been applied to what it settles.
+ *   - revenue's `PARTIALLY_REFUNDED` is a transaction's own state.
+ *
+ * None of them answers "what do we charge this customer right now", and a host
+ * that guesses charges either nothing or everything — opposite answers to the
+ * same question.
+ *
+ * It lives here, beside {@link MONETIZATION_KINDS}, for the reason stated in
+ * catalog's barrel: monetization is a CROSS-KERNEL contract. Catalog declares
+ * the policy on a product, order turns it into tenders, revenue settles them.
+ * Three packages reading one definition, none re-exporting it.
+ *
+ *   - `full_payment` — the whole price, before the sale completes.
+ *   - `deposit`      — a fixed amount now, the balance outstanding on the
+ *                      order and settled later by another tender. One provider
+ *                      line instead of two, which matters when card fees are
+ *                      charged per transaction.
+ *   - `pay_later`    — nothing now. The order still records what is owed.
+ *
+ * ABSENCE means `full_payment` — the behaviour before this existed — so no
+ * stored record changes meaning when a build that knows this field ships.
+ */
+export const UPFRONT_COLLECTION_MODES = ['full_payment', 'deposit', 'pay_later'] as const;
+
+export type UpfrontCollectionMode = (typeof UPFRONT_COLLECTION_MODES)[number];
+
+const UPFRONT_COLLECTION_MODE_SET = new Set<UpfrontCollectionMode>(UPFRONT_COLLECTION_MODES);
+
+/**
+ * Narrow an unknown value to a collection mode.
+ *
+ * Readers MUST treat `false` as UNKNOWN, never as `full_payment`: a record
+ * written by a build that knows a mode this one does not has not said "charge
+ * everything", and assuming so takes money nobody agreed to.
+ */
+export function isUpfrontCollectionMode(value: unknown): value is UpfrontCollectionMode {
+  return (
+    typeof value === 'string' && UPFRONT_COLLECTION_MODE_SET.has(value as UpfrontCollectionMode)
+  );
+}
+
 /* ───────────────────────── one_time pricing detail ──────────────────────── */
 
 /** A quantity-based price break. `price` (fixed override) XOR `discountPercent`. */

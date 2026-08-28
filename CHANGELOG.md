@@ -3,6 +3,23 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.0] — 2026-08-27
+
+### Added
+
+- **`./deadline` subpath** — `Deadline` value type + helpers for date-bounded
+  obligations (reservations, SLA windows, contract terms).
+- **`./stock-level` subpath** — canonical stock-level representation and helpers.
+- **`./item-facts` subpath** — cross-kernel item fact contract (weight, dimensions,
+  hazmat flags) that catalog declares and logistics/inventory reads.
+- **`StockKey` branded type** (`./item-identity`) — prevents a bare merchandising
+  label or ObjectId being passed where a quant key is expected; the only source is
+  `stockKeyOf()` / `requireStockKey()`. Return types of both functions updated.
+- **Upfront collection policy** (`./monetization`) — `UpfrontCollectionPolicy`
+  (`'full_payment' | 'deposit' | 'deferred'`) + `UPFRONT_COLLECTION_POLICIES`
+  const. Cross-kernel: catalog declares the policy, order turns it into tenders,
+  revenue settles them.
+
 ## [0.25.0] - 2026-08-24
 
 ### Added

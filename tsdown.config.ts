@@ -38,6 +38,8 @@ export default defineConfig({
     'identity-verification': 'src/identity/identity-verification.ts',
     otp: 'src/identity/otp.ts',
     'item-identity': 'src/identity/item-identity.ts',
+    'stock-level': 'src/inventory/stock-level.ts',
+    'item-facts': 'src/inventory/item-facts.ts',
 
     // ─── serialization ──────────────────────────────────────────────────
     canonical: 'src/serialization/canonical.ts',
@@ -77,6 +79,7 @@ export default defineConfig({
 
     // ─── composition ────────────────────────────────────────────────────
     mixin: 'src/composition/mixin.ts',
+    deadline: 'src/composition/deadline.ts',
     reference: 'src/composition/reference.ts',
     'fault-attribution': 'src/composition/fault-attribution.ts',
     context: 'src/composition/context.ts',

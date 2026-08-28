@@ -19,6 +19,18 @@
  * Pinned by `tests/unit/item-identity.test.ts`.
  */
 
+import type { Brand } from "../composition/brand.js";
+
+/**
+ * A resolved STOCK key — the string quants, moves and reservations are keyed by.
+ *
+ * Branded so a port that moves stock cannot accept a bare string: the only way
+ * to obtain one is {@link stockKeyOf} / {@link requireStockKey}, which apply the
+ * `skuRef ?? sku` rule. A merchandising label passed where a stock key belongs
+ * finds no quant and reports "out of stock" against a full shelf.
+ */
+export type StockKey = Brand<string, "StockKey">;
+
 /** Identifier fields a record may carry — each shape populates a different subset. */
 export interface SkuFields {
   /** Merchandising label — mutable, human-facing. */
@@ -42,15 +54,20 @@ const nonEmpty = (value: string | undefined): string | undefined =>
  * malformed, not untracked. Use {@link requireStockKey} where that must stop
  * the write.
  */
-export function stockKeyOf(item: SkuFields, fallback?: string | { toString(): string }): string | undefined {
-  return nonEmpty(item.skuRef) ?? nonEmpty(item.sku) ?? (fallback !== undefined ? String(fallback) : undefined);
+export function stockKeyOf(
+  item: SkuFields,
+  fallback?: string | { toString(): string },
+): StockKey | undefined {
+  return (nonEmpty(item.skuRef) ??
+    nonEmpty(item.sku) ??
+    (fallback !== undefined ? String(fallback) : undefined)) as StockKey | undefined;
 }
 
 /**
  * {@link stockKeyOf} that THROWS. Use wherever the key feeds a stock movement:
  * a reservation on `undefined` returns "out of stock" instead of failing.
  */
-export function requireStockKey(item: SkuFields, context?: string): string {
+export function requireStockKey(item: SkuFields, context?: string): StockKey {
   const key = stockKeyOf(item);
   if (key === undefined) {
     throw new Error(
@@ -59,6 +76,15 @@ export function requireStockKey(item: SkuFields, context?: string): string {
   }
   return key;
 }
+
+/**
+ * The brand is proved HERE, not in tests — this package's tsconfig excludes
+ * test files, so a `@ts-expect-error` in one is never evaluated. Deleting the
+ * brand from {@link StockKey} makes the next line an error.
+ */
+type AssertNotAssignable<A, B> = A extends B ? never : true;
+const _bareStringIsNotAStockKey: AssertNotAssignable<string, StockKey> = true;
+void _bareStringIsNotAStockKey;
 
 /** What a surface should render for an item, and whether it had a real label. */
 export interface SkuDisplay {
