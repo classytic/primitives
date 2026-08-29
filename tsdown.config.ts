@@ -40,6 +40,7 @@ export default defineConfig({
     'item-identity': 'src/identity/item-identity.ts',
     'stock-level': 'src/inventory/stock-level.ts',
     'item-facts': 'src/inventory/item-facts.ts',
+    'testing/stock-key-seam': 'src/testing/stock-key-seam.ts',
 
     // ─── serialization ──────────────────────────────────────────────────
     canonical: 'src/serialization/canonical.ts',

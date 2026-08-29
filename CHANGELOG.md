@@ -3,6 +3,10 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.26.1
+
+- `./testing/stock-key-seam` — new subpath; `scanStockKeySeam`, `assertStockKeySeam`, `takesStockKeyFromLabel`, `STOCK_KEY_SEAM_FIXTURES` for conformance-scanning packages that resolve stock keys
+
 ## [0.26.0] — 2026-08-27
 
 ### Added
