@@ -3,6 +3,29 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.26.2
+
+### Added — `stockKeyFor` (`/item-identity`): one stock-key precedence for every package
+
+The product-level stock key, with a single precedence:
+
+1. the variant's stamped `skuRef` — assigned once at birth, immutable
+2. a **sole** variant with no stamp → the product's `_id`, never the label
+   (legacy writers derived `variantSku || productId`, and for one variant that
+   key IS the `_id`)
+3. a **sibling** with no stamp → its label, which genuinely is its legacy key
+4. nothing addressable → the product's `_id`
+
+The caller declares only what it HAS — `{ kind: 'sole' | 'label' | 'variant' }`
+— so the sole-vs-sibling decision is internal and a caller cannot make it wrong.
+That choice previously lived at every call site across three packages, in two
+functions with different fallbacks; they disagreed on a sole, unstamped,
+labelled variant, and the read then looked up a key no quant is stored under.
+
+It lives here, below every domain, because `@spinekit/order` and
+`@spinekit/catalog` must not import a peer domain — the rule sitting one layer
+too high is exactly why each package re-derived it.
+
 ## 0.26.1
 
 - `./testing/stock-key-seam` — new subpath; `scanStockKeySeam`, `assertStockKeySeam`, `takesStockKeyFromLabel`, `STOCK_KEY_SEAM_FIXTURES` for conformance-scanning packages that resolve stock keys
