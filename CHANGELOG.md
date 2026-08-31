@@ -3,6 +3,17 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.26.3
+
+### Added — `PaymentProviderPort.wantsRawBody`
+
+Optional `readonly wantsRawBody?: boolean` on the payment gateway port.
+Providers that verify an HMAC signature (Stripe signs the bytes it transmitted)
+must declare `true` — the transport then hands the raw body rather than the
+parsed object. Absent / `false` preserves the historical behaviour (parsed
+body), which is correct for manual, cash and terminal providers that sign
+nothing.
+
 ## 0.26.2
 
 ### Added — `stockKeyFor` (`/item-identity`): one stock-key precedence for every package

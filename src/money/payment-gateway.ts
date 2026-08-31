@@ -347,6 +347,26 @@ export interface PaymentProviderPort {
     command?: PaymentCommandContext,
   ): Promise<PaymentResult>;
 
+  /**
+   * Does this provider need the EXACT transmitted bytes, rather than the
+   * parsed body?
+   *
+   * `true` for anything that verifies an HMAC signature — Stripe signs the
+   * bytes it sent, and a re-serialized object differs in key order, spacing and
+   * unicode escaping, so a check against the parsed form can never pass.
+   *
+   * Declared by the provider rather than decided by the transport, because the
+   * transport cannot know. Handing raw bytes to every provider breaks the ones
+   * that read `payload.sessionId` — they get a string and silently see
+   * `undefined`, so the webhook resolves to no transaction and the payment
+   * never applies. Handing the parsed body to every provider breaks signature
+   * verification. Only the provider knows which it is.
+   *
+   * Absent means `false`: the historical behaviour, and correct for manual,
+   * cash and terminal providers that sign nothing.
+   */
+  readonly wantsRawBody?: boolean;
+
   handleWebhook(payload: unknown, headers?: Record<string, string>): Promise<WebhookEvent>;
 
   /**
