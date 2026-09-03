@@ -3,6 +3,20 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.26.4
+
+### Added — `./price-basis` subpath: measured pricing across physical dimensions
+
+New `PriceBasis` type (`FixedPriceBasis | MeasuredPriceBasis`) models how a quoted price spans a sellable quantity — flat fixed or per-unit-of-measure (mass, duration, volume, length, area). Factory functions `fixedPriceBasis()` and `measuredPriceBasis(dimension, qtyUnit, priceUnit, qtyPerPriceUnit)` construct the two shapes; `isPriceBasis()` is a structural guard for DB/wire boundaries. `resolvePriceBasisTotal(unitPriceMinor, quantity, basis?)` converts a minor-unit price × integer quantity to a final minor-unit total using half-even rounding (`roundedDiv` internally) and throws `PriceBasisError` on unsafe inputs or overflow.
+
+### Added — `./unit-cost-rate` re-exports `RoundingMode`
+
+`RoundingMode` (`'half-even' | 'half-up'`) is now defined in the new internal `rounded-div.ts` and re-exported from `unit-cost-rate`. No breaking change — existing consumers who import `RoundingMode` from `@classytic/primitives/unit-cost-rate` continue to work.
+
+### Changed — `validateAddress` / `isAddressValid` accept `Address` directly
+
+Both functions now accept `Address | PartialAddress | null | undefined`, removing the need for a cast when validating a fully-typed value object.
+
 ## 0.26.3
 
 ### Added — `PaymentProviderPort.wantsRawBody`

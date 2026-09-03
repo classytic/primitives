@@ -25,6 +25,9 @@ import { type MinorUnits, MinorUnits as toMinorUnits } from './money.js';
  */
 
 import type { CurrencyCode } from './currency.js';
+import { type RoundingMode, roundedDiv } from './rounded-div.js';
+
+export type { RoundingMode } from './rounded-div.js';
 
 /** Fixed, ecosystem-wide rate scale: 6 decimal places below the minor unit. */
 export const RATE_SCALE = 1_000_000;
@@ -35,9 +38,6 @@ export const RATE_SCALE = 1_000_000;
  * precision — quantities finer than 1e-6 unit are rounded to this grid.
  */
 const QTY_SCALE = 1_000_000;
-
-/** Half-to-even (banker's) is the default; half-up available for legacy parity. */
-export type RoundingMode = 'half-even' | 'half-up';
 
 const DEFAULT_ROUNDING: RoundingMode = 'half-even';
 
@@ -243,23 +243,3 @@ export function isUnitCostRate(value: unknown): value is UnitCostRate {
  * (`denominator > 0`), honouring the rounding mode at the exact half.
  * Sign-safe for negative numerators.
  */
-function roundedDiv(numerator: bigint, denominator: bigint, mode: RoundingMode): bigint {
-  const neg = numerator < 0n;
-  const n = neg ? -numerator : numerator;
-  const q = n / denominator;
-  const remainder = n - q * denominator;
-  if (remainder === 0n) return neg ? -q : q;
-
-  const twiceRem = remainder * 2n;
-  let up: boolean;
-  if (twiceRem > denominator) {
-    up = true;
-  } else if (twiceRem < denominator) {
-    up = false;
-  } else {
-    // exact half
-    up = mode === 'half-up' ? true : q % 2n !== 0n; // half-even: round to even
-  }
-  const result = up ? q + 1n : q;
-  return neg ? -result : result;
-}

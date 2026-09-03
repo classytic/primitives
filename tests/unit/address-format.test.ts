@@ -30,6 +30,7 @@ import {
   describeAddressError,
   type AddressFieldKey,
   type AddressFormatRegistry,
+  type Address,
 } from '../../src/identity/address.js';
 import { BD_ADDRESS_FORMAT } from '../../../bd-areas/src/address-format/index.js';
 
@@ -167,6 +168,18 @@ describe('validateAddress', () => {
 
   it('passes a complete BD address', () => {
     expect(validateAddress(BD_OK, BD_ADDRESS_FORMAT)).toEqual([]);
+  });
+
+  it('accepts the canonical Address value object directly', () => {
+    const address: Address = {
+      line1: '1 Raffles Place',
+      city: 'Singapore',
+      country: 'SG',
+    };
+    expect(validateAddress(address, INTERNATIONAL_ADDRESS_FORMAT)).toEqual([
+      { key: 'name', code: 'required', label: 'Recipient Name' },
+      { key: 'phone', code: 'required', label: 'Phone' },
+    ]);
   });
 
   it('reports EVERY missing field, not just the first', () => {

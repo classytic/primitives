@@ -377,11 +377,12 @@ export interface AddressFieldError {
  * a courier label. Required means a value, not a character.
  */
 export function validateAddress(
-  address: PartialAddress | null | undefined,
+  address: Address | PartialAddress | null | undefined,
   format: AddressFormat,
 ): AddressFieldError[] {
   const errors: AddressFieldError[] = [];
-  const value = (k: string): string => String(address?.[k] ?? '').trim();
+  const values = address as Readonly<Record<string, unknown>> | null | undefined;
+  const value = (k: string): string => String(values?.[k] ?? '').trim();
 
   /**
    * Canonical and extension fields are checked IDENTICALLY, keyed by
@@ -415,7 +416,7 @@ export function validateAddress(
 
 /** Convenience for a submit gate. */
 export function isAddressValid(
-  address: PartialAddress | null | undefined,
+  address: Address | PartialAddress | null | undefined,
   format: AddressFormat,
 ): boolean {
   return validateAddress(address, format).length === 0;
