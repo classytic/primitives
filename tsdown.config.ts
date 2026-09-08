@@ -45,6 +45,7 @@ export default defineConfig({
 
     // ─── serialization ──────────────────────────────────────────────────
     canonical: 'src/serialization/canonical.ts',
+    csv: 'src/serialization/csv.ts',
 
     // ─── scheduling ─────────────────────────────────────────────────────
     period: 'src/scheduling/period.ts',

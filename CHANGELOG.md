@@ -3,6 +3,30 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.27.0
+
+### Added — `./csv` subpath: one CSV cell escaper for the whole fleet
+
+`escapeCsvCell(value)` and `neutralizeCsvFormula(value)`. Six CSV producers
+across ledger, the spine and the hosts each hand-rolled RFC 4180 quoting, and
+not one neutralized a leading `= + - @ \t \r` — so a customer-supplied payment
+reference or party name reached the accountant's spreadsheet as a live formula.
+Quoting does not help: a spreadsheet strips the quotes and evaluates what is
+left, which is why the two defences ship as one module.
+
+The two functions are separable on purpose. A consumer holding a real CSV
+writer (`csv-stringify`) takes `neutralizeCsvFormula` only, so its quoting is
+not done twice; a hand-rolled `rows.map(...).join(',')` takes `escapeCsvCell`.
+
+**Well-formed numbers are exempt.** Prefixing `-1500` would make every negative
+amount text and break `SUM` in every finance export — a fix that quietly
+corrupts the product is worse than the hole. The exemption requires the WHOLE
+cell to be a number, so `-2+3+cmd|'/c calc'!A0` is still neutralized.
+
+Not for a machine-to-machine upload contract with a fixed column spec (a
+courier's bulk-import CSV): there the receiver is a parser, not a spreadsheet,
+and an added `'` corrupts the payload.
+
 ## 0.26.4
 
 ### Added — `./price-basis` subpath: measured pricing across physical dimensions
