@@ -14,7 +14,7 @@ describe('neutralizeCsvFormula', () => {
     ["=cmd|'/c calc'!A1", "'=cmd|'/c calc'!A1"],
     ['@SUM(A1:A9)', "'@SUM(A1:A9)"],
     ['+1+1', "'+1+1"],
-    ['-2+3+cmd|\'/c calc\'!A0', "'-2+3+cmd|'/c calc'!A0"],
+    ["-2+3+cmd|'/c calc'!A0", "'-2+3+cmd|'/c calc'!A0"],
     ['\tDDE', "'\tDDE"],
     ['\r=1+1', "'\r=1+1"],
   ])('neutralizes %j', (input, expected) => {
@@ -22,12 +22,18 @@ describe('neutralizeCsvFormula', () => {
   });
 
   describe('leaves real numbers alone — a prefixed number breaks SUM', () => {
-    it.each(['-1500', '-1500.75', '+42', '0', '1e6', '-1.5e-3', '.5', '-.5'])(
-      '%s is unchanged',
-      (input) => {
-        expect(neutralizeCsvFormula(input)).toBe(input);
-      },
-    );
+    it.each([
+      '-1500',
+      '-1500.75',
+      '+42',
+      '0',
+      '1e6',
+      '-1.5e-3',
+      '.5',
+      '-.5',
+    ])('%s is unchanged', (input) => {
+      expect(neutralizeCsvFormula(input)).toBe(input);
+    });
 
     it('accepts a negative JS number, not just its string', () => {
       expect(neutralizeCsvFormula(-1500.75)).toBe('-1500.75');
