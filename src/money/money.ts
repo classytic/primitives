@@ -6,6 +6,12 @@ import {
   minorUnitFactor,
 } from './currency.js';
 
+export {
+  CASH_DESTINATIONS,
+  type CashDestination,
+  cashDestinationLabel,
+  isCashDestination,
+} from './cash-destination.js';
 /**
  * Re-exported so `@classytic/primitives/money` remains the import site every
  * consumer already uses. The class is DECLARED in `/currency` because the FX

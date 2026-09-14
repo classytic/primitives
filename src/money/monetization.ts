@@ -55,8 +55,18 @@ export type MoneyByCurrency = Record<string, Money>;
  *   - `bundle`       — a composite priced from its members.
  *   - `usage`        — metered / per-seat / consumption (billed per unit or in
  *                      arrears). The extension point for rating models.
+ *   - `pass`         — paid once, grants a TERM, never renews (a course access
+ *                      pass, a gym or transit pass, a parking or day pass, a
+ *                      term licence). See {@link PassMonetization}.
  */
-export const MONETIZATION_KINDS = ['free', 'one_time', 'subscription', 'bundle', 'usage'] as const;
+export const MONETIZATION_KINDS = [
+  'free',
+  'one_time',
+  'subscription',
+  'bundle',
+  'usage',
+  'pass',
+] as const;
 
 export type MonetizationKind = (typeof MONETIZATION_KINDS)[number];
 
@@ -167,6 +177,34 @@ export interface SubscriptionPlan {
   readonly discount?: number;
 }
 
+/* ──────────────────────────── pass pricing detail ───────────────────────── */
+
+/**
+ * One buyable term: a price that grants access for a fixed span.
+ *
+ * Shaped like {@link SubscriptionPlan} on purpose (same `duration` +
+ * `durationUnit` vocabulary, so a term means the same thing everywhere) and
+ * kept separate on purpose: a plan carries `trialDays` and a renewal discount,
+ * which are recurring-billing concepts a pass has none of. Reusing the plan
+ * would re-blur the very line this kind exists to draw.
+ */
+export interface AccessPass {
+  /** Internal key ('pass-30d', 'season', 'day'). Stable across edits. */
+  readonly key: string;
+  /** Display label ("1 month", "Season pass", "Day pass"). */
+  readonly label: string;
+  /** Price for this term in the default currency. */
+  readonly price: Money;
+  /** Explicit per-currency overrides. */
+  readonly priceByCurrency?: MoneyByCurrency;
+  /** Optional strikethrough / "was" price for this term. */
+  readonly compareAtPrice?: Money;
+  /** Length of access this term buys. */
+  readonly duration: number;
+  /** Unit of that length. */
+  readonly durationUnit: DurationUnit;
+}
+
 /* ─────────────────────────── usage pricing detail ───────────────────────── */
 
 /**
@@ -253,6 +291,28 @@ export interface UsageMonetization {
 }
 
 /**
+ * Paid once, grants a TERM, never renews.
+ *
+ * The gap this closes: `one_time` prices a thing but says nothing about how
+ * long it is yours, and `subscription` prices a term but means it RECURS. A
+ * prepaid term fits neither, so hosts selling one reached for `subscription`
+ * and then had to explain, wherever the value was read, that it does not
+ * actually renew — a classification that needs a comment to be understood has
+ * already failed, and `toRevenueMonetizationType` would have settled those
+ * sales as subscriptions in the ledger.
+ *
+ * Buying again EXTENDS rather than renewing: nothing schedules a charge, the
+ * buyer chooses when (or whether) to pay for the next term. A perpetual sale
+ * is `one_time`, not a pass with an enormous duration: "forever" is the
+ * absence of a term, not a long one.
+ */
+export interface PassMonetization {
+  readonly type: 'pass';
+  /** At least one term. Several means the buyer picks (1 month / 1 year). */
+  readonly passes: readonly AccessPass[];
+}
+
+/**
  * The canonical monetization value object. The `type` discriminant selects the
  * pricing detail. Matches `@classytic/catalog`'s existing discriminants (so no
  * data migration) plus `usage`.
@@ -262,7 +322,8 @@ export type Monetization =
   | OneTimeMonetization
   | SubscriptionMonetization
   | BundleMonetization
-  | UsageMonetization;
+  | UsageMonetization
+  | PassMonetization;
 
 /* ─────────────────────────────── guards ─────────────────────────────────── */
 
@@ -274,6 +335,57 @@ export const isSubscriptionMonetization = (m: Monetization): m is SubscriptionMo
 export const isBundleMonetization = (m: Monetization): m is BundleMonetization =>
   m.type === 'bundle';
 export const isUsageMonetization = (m: Monetization): m is UsageMonetization => m.type === 'usage';
+export const isPassMonetization = (m: Monetization): m is PassMonetization => m.type === 'pass';
+
+const APPROX_DAYS_PER_UNIT: Record<DurationUnit, number> = {
+  day: 1,
+  week: 7,
+  month: 30,
+  year: 365,
+};
+
+/**
+ * A term's length in APPROXIMATE days, for ORDERING AND LABELS ONLY.
+ *
+ * A month is 30 here and a year 365, which is wrong as a date and right as a
+ * comparison: it answers "is this term longer than that one" and "call this
+ * one '6 months'", both of which only need a stable ranking.
+ *
+ * NEVER compute an expiry from it. A term that ENDS on a date must be added
+ * with calendar arithmetic (`addMonths` / `addYears`), or February and leap
+ * years quietly short-change the buyer. That belongs to the host's date
+ * library, not to a pure money value object.
+ */
+export function approxTermDays(duration: number, unit: DurationUnit): number {
+  return duration * APPROX_DAYS_PER_UNIT[unit];
+}
+
+/**
+ * The term a storefront leads with: the CHEAPEST, ties broken by the shortest
+ * span so the answer is deterministic whatever order the passes were authored
+ * in. One definition, because a card reading the cheapest while a checkout
+ * defaulted to the first is the divergence {@link unitPriceOf} exists to stop.
+ *
+ * The tie-break compares SPANS, not the raw `duration`: "1 year" and "1 month"
+ * are both `duration: 1`, so a number-only comparison ranks them by whichever
+ * happened to be authored first.
+ */
+export function defaultPassOf(m: PassMonetization): AccessPass | null {
+  let best: AccessPass | null = null;
+  let bestSpan = Number.POSITIVE_INFINITY;
+  for (const pass of m.passes) {
+    const span = approxTermDays(pass.duration, pass.durationUnit);
+    if (
+      best === null ||
+      pass.price.amount < best.price.amount ||
+      (pass.price.amount === best.price.amount && span < bestSpan)
+    ) {
+      best = pass;
+      bestSpan = span;
+    }
+  }
+  return best;
+}
 
 /** The kind of a monetization value (its discriminant, narrowed to the union). */
 export const monetizationKindOf = (m: Monetization): MonetizationKind => m.type;
@@ -292,6 +404,8 @@ export const monetizationKindOf = (m: Monetization): MonetizationKind => m.type;
  *   - `bundle`       → the FIXED bundle price; `null` in `dynamic` mode (that
  *                      price is computed from the members, not stored here)
  *   - `free`         → `null`
+ *   - `pass`         → the cheapest term's price (the "from" price a
+ *                      storefront leads with), see {@link defaultPassOf}
  *   - `usage`        → `null` — a metered item has no single unit price; it is
  *                      rated per consumption via {@link UsageRating}
  *
@@ -306,15 +420,26 @@ export function unitPriceOf(m: Monetization): Money | null {
       return m.plans[0]?.price ?? null;
     case 'bundle':
       return m.basePrice ?? null;
+    case 'pass':
+      return defaultPassOf(m)?.price ?? null;
     case 'free':
     case 'usage':
       return null;
   }
 }
 
-/** The strikethrough / MSRP price, if the kind carries one (only `one_time`). */
+/**
+ * The strikethrough / MSRP price, for the kinds that carry one.
+ *
+ * Always paired with whatever {@link unitPriceOf} returned, so a card can
+ * never strike through the "was" of one term beside the price of another:
+ * `one_time` compares against its base price, `pass` against the term
+ * `defaultPassOf` picked.
+ */
 export function compareAtPriceOf(m: Monetization): Money | null {
-  return m.type === 'one_time' ? (m.pricing.compareAtPrice ?? null) : null;
+  if (m.type === 'one_time') return m.pricing.compareAtPrice ?? null;
+  if (m.type === 'pass') return defaultPassOf(m)?.compareAtPrice ?? null;
+  return null;
 }
 
 /* ───────────────── reconciliation with revenue's wire enum ───────────────── */
@@ -330,7 +455,10 @@ export type RevenueMonetizationType = 'free' | 'purchase' | 'subscription';
 /**
  * Canonical kind → revenue wire type. Everything that is not `free` or
  * `subscription` settles as a `purchase` in revenue's ledger vocabulary
- * (one_time, bundle, and a usage charge are all "a purchase happened").
+ * (one_time, bundle, a usage charge and a pass are all "a purchase
+ * happened"). A `pass` in particular must NOT land on `subscription`: nothing
+ * schedules a renewal, and a ledger that thinks otherwise forecasts revenue
+ * that will never be billed.
  */
 export function toRevenueMonetizationType(kind: MonetizationKind): RevenueMonetizationType {
   if (kind === 'free') return 'free';

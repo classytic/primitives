@@ -3,6 +3,44 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.28.0
+
+### Added: a `pass` monetization kind (paid once, grants a term, never renews)
+
+The union could say "charged once" (`one_time`, a single price, no span) and
+"recurring" (`subscription`, priced spans that renew). It could not say
+"prepaid term": a course access pass, a gym or transit pass, a parking permit,
+a term licence. Hosts selling one reached for `subscription`, the only shape
+that carried priced spans, and then had to explain at every read that it does
+not actually renew. `toRevenueMonetizationType` would also have settled those
+sales as recurring income, forecasting revenue nothing was scheduled to bill.
+
+`PassMonetization { type: 'pass', passes: AccessPass[] }`, where an
+`AccessPass` is a key, a label, a price, an optional "was" price, and a
+`duration` + `durationUnit`. Shaped like `SubscriptionPlan` so a term means
+the same thing everywhere, kept separate because a plan carries `trialDays`
+and a renewal discount that a pass has none of.
+
+Also: `isPassMonetization`, `defaultPassOf` (the cheapest term, ties broken on
+the shorter SPAN so the headline is deterministic), and `approxTermDays` for
+ordering and labels only. `unitPriceOf` returns the cheapest term's price for
+a pass, `compareAtPriceOf` now returns the "was" of that SAME term so a card
+can never strike one term's price through beside another's, and
+`toRevenueMonetizationType('pass')` is `purchase`.
+
+A perpetual sale stays `one_time`: "forever" is the absence of a term, not a
+very long one.
+
+### Added — `CashDestination` on `./money`
+
+`CASH_DESTINATIONS` (`'cash' | 'petty_cash'`), `isCashDestination` and
+`cashDestinationLabel`: WHERE received cash landed, as an intent — never a
+chart-of-accounts code. One vocabulary for a request body, a domain event, a
+client SDK and a settlement dialog, so the accounting tier alone maps it to the
+active chart and a renumber cannot reach any of them. Added because a client
+carried a literal bank code the chart had already renumbered, and every
+settlement it sent was refused.
+
 ## 0.27.0
 
 ### Added — `./csv` subpath: one CSV cell escaper for the whole fleet

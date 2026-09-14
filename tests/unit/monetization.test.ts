@@ -8,26 +8,35 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  type Monetization,
-  MONETIZATION_KINDS,
-  type MonetizationKind,
+  compareAtPriceOf,
+  defaultPassOf,
   fromRevenueMonetizationType,
   isBundleMonetization,
   isFreeMonetization,
   isMonetizationKind,
   isOneTimeMonetization,
+  isPassMonetization,
   isSubscriptionMonetization,
   isUsageMonetization,
+  MONETIZATION_KINDS,
+  type Monetization,
+  type MonetizationKind,
   monetizationKindOf,
-  compareAtPriceOf,
   type RevenueMonetizationType,
   toRevenueMonetizationType,
   unitPriceOf,
 } from '../../src/money/monetization.js';
 
 describe('MonetizationKind', () => {
-  it('lists the five canonical kinds and guards them', () => {
-    expect([...MONETIZATION_KINDS]).toEqual(['free', 'one_time', 'subscription', 'bundle', 'usage']);
+  it('lists the six canonical kinds and guards them', () => {
+    expect([...MONETIZATION_KINDS]).toEqual([
+      'free',
+      'one_time',
+      'subscription',
+      'bundle',
+      'usage',
+      'pass',
+    ]);
     for (const k of MONETIZATION_KINDS) expect(isMonetizationKind(k)).toBe(true);
     expect(isMonetizationKind('purchase')).toBe(false); // revenue's wire name is NOT a kind
     expect(isMonetizationKind(undefined)).toBe(false);
@@ -37,13 +46,39 @@ describe('MonetizationKind', () => {
 describe('discriminated union guards', () => {
   const samples: Record<MonetizationKind, Monetization> = {
     free: { type: 'free' },
-    one_time: { type: 'one_time', pricing: { basePrice: { amount: 12000, currency: 'BDT' }, currency: 'BDT' } },
+    one_time: {
+      type: 'one_time',
+      pricing: { basePrice: { amount: 12000, currency: 'BDT' }, currency: 'BDT' },
+    },
     subscription: {
       type: 'subscription',
-      plans: [{ key: 'monthly', label: 'Monthly', price: { amount: 50000, currency: 'BDT' }, duration: 1, durationUnit: 'month' }],
+      plans: [
+        {
+          key: 'monthly',
+          label: 'Monthly',
+          price: { amount: 50000, currency: 'BDT' },
+          duration: 1,
+          durationUnit: 'month',
+        },
+      ],
     },
     bundle: { type: 'bundle', pricingMode: 'dynamic', dynamicDiscountPercent: 10 },
-    usage: { type: 'usage', rating: { scheme: 'per_unit', perUnit: { amount: 500, currency: 'BDT' }, unitLabel: 'visit' } },
+    usage: {
+      type: 'usage',
+      rating: { scheme: 'per_unit', perUnit: { amount: 500, currency: 'BDT' }, unitLabel: 'visit' },
+    },
+    pass: {
+      type: 'pass',
+      passes: [
+        {
+          key: 'm1',
+          label: '1 month',
+          price: { amount: 50000, currency: 'BDT' },
+          duration: 1,
+          durationUnit: 'month',
+        },
+      ],
+    },
   };
 
   it('narrows each kind and reports it via monetizationKindOf', () => {
@@ -52,6 +87,7 @@ describe('discriminated union guards', () => {
     expect(isSubscriptionMonetization(samples.subscription)).toBe(true);
     expect(isBundleMonetization(samples.bundle)).toBe(true);
     expect(isUsageMonetization(samples.usage)).toBe(true);
+    expect(isPassMonetization(samples.pass)).toBe(true);
     for (const [kind, m] of Object.entries(samples)) {
       expect(monetizationKindOf(m)).toBe(kind);
     }
@@ -63,7 +99,9 @@ describe('price resolution', () => {
 
   it('picks the headline unit price per kind', () => {
     expect(unitPriceOf({ type: 'free' })).toBeNull();
-    expect(unitPriceOf({ type: 'one_time', pricing: { basePrice: money(12000), currency: 'BDT' } })).toEqual(money(12000));
+    expect(
+      unitPriceOf({ type: 'one_time', pricing: { basePrice: money(12000), currency: 'BDT' } }),
+    ).toEqual(money(12000));
     expect(
       unitPriceOf({
         type: 'subscription',
@@ -73,15 +111,90 @@ describe('price resolution', () => {
         ],
       }),
     ).toEqual(money(50000)); // the FIRST plan, deterministically
-    expect(unitPriceOf({ type: 'bundle', pricingMode: 'fixed', basePrice: money(9900) })).toEqual(money(9900));
-    expect(unitPriceOf({ type: 'bundle', pricingMode: 'dynamic', dynamicDiscountPercent: 10 })).toBeNull();
-    expect(unitPriceOf({ type: 'usage', rating: { scheme: 'per_unit', perUnit: money(500) } })).toBeNull();
+    expect(unitPriceOf({ type: 'bundle', pricingMode: 'fixed', basePrice: money(9900) })).toEqual(
+      money(9900),
+    );
+    expect(
+      unitPriceOf({ type: 'bundle', pricingMode: 'dynamic', dynamicDiscountPercent: 10 }),
+    ).toBeNull();
+    expect(
+      unitPriceOf({ type: 'usage', rating: { scheme: 'per_unit', perUnit: money(500) } }),
+    ).toBeNull();
+    // A pass leads with the CHEAPEST term, whatever order it was authored in.
+    expect(
+      unitPriceOf({
+        type: 'pass',
+        passes: [
+          { key: 'y', label: '1 year', price: money(200000), duration: 1, durationUnit: 'year' },
+          { key: 'm', label: '1 month', price: money(50000), duration: 1, durationUnit: 'month' },
+        ],
+      }),
+    ).toEqual(money(50000));
+    expect(unitPriceOf({ type: 'pass', passes: [] })).toBeNull();
   });
 
-  it('exposes compareAt only for one_time', () => {
-    expect(compareAtPriceOf({ type: 'one_time', pricing: { basePrice: money(12000), currency: 'BDT', compareAtPrice: money(15000) } })).toEqual(money(15000));
+  it('breaks a price tie on the shorter term, so the headline is deterministic', () => {
+    const passes = [
+      {
+        key: 'y',
+        label: '1 year',
+        price: money(50000),
+        duration: 1,
+        durationUnit: 'year' as const,
+      },
+      {
+        key: 'm',
+        label: '1 month',
+        price: money(50000),
+        duration: 1,
+        durationUnit: 'month' as const,
+      },
+    ];
+    expect(defaultPassOf({ type: 'pass', passes })?.key).toBe('m');
+    expect(defaultPassOf({ type: 'pass', passes: [...passes].reverse() })?.key).toBe('m');
+  });
+
+  it('pairs a pass compareAt with the term the headline price came from', () => {
+    const m: Monetization = {
+      type: 'pass',
+      passes: [
+        {
+          key: 'y',
+          label: '1 year',
+          price: money(200000),
+          compareAtPrice: money(300000),
+          duration: 1,
+          durationUnit: 'year',
+        },
+        {
+          key: 'm',
+          label: '1 month',
+          price: money(50000),
+          compareAtPrice: money(60000),
+          duration: 1,
+          durationUnit: 'month',
+        },
+      ],
+    };
+    // The cheapest term is the headline, so its "was" is the one struck through.
+    expect(unitPriceOf(m)).toEqual(money(50000));
+    expect(compareAtPriceOf(m)).toEqual(money(60000));
+  });
+
+  it('exposes compareAt only for the kinds that carry one', () => {
+    expect(
+      compareAtPriceOf({
+        type: 'one_time',
+        pricing: { basePrice: money(12000), currency: 'BDT', compareAtPrice: money(15000) },
+      }),
+    ).toEqual(money(15000));
     expect(compareAtPriceOf({ type: 'free' })).toBeNull();
-    expect(compareAtPriceOf({ type: 'subscription', plans: [{ key: 'm', label: 'M', price: money(1), duration: 1, durationUnit: 'month' }] })).toBeNull();
+    expect(
+      compareAtPriceOf({
+        type: 'subscription',
+        plans: [{ key: 'm', label: 'M', price: money(1), duration: 1, durationUnit: 'month' }],
+      }),
+    ).toBeNull();
   });
 });
 
@@ -92,10 +205,13 @@ describe('revenue reconciliation', () => {
     expect(fromRevenueMonetizationType('free')).toBe('free');
   });
 
-  it('collapses one_time / bundle / usage to a purchase in revenue vocabulary', () => {
+  it('collapses one_time / bundle / usage / pass to a purchase in revenue vocabulary', () => {
     expect(toRevenueMonetizationType('one_time')).toBe('purchase');
     expect(toRevenueMonetizationType('bundle')).toBe('purchase');
     expect(toRevenueMonetizationType('usage')).toBe('purchase');
+    // A pass never renews: settling it as a subscription would forecast
+    // revenue nothing is scheduled to bill.
+    expect(toRevenueMonetizationType('pass')).toBe('purchase');
     expect(toRevenueMonetizationType('subscription')).toBe('subscription');
     expect(toRevenueMonetizationType('free')).toBe('free');
   });
