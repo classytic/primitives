@@ -140,7 +140,13 @@ export class MemoryOutboxStore implements OutboxStore {
       // lease expiry mints strictly greater, so the previous holder's token
       // stops acknowledging. Minted by the store; a process cannot fence itself.
       entry.fenceToken = (entry.fenceToken ?? 0) + 1;
-      claimed.push({ event: entry.event, fencingToken: entry.fenceToken });
+      // `attempts` was incremented above, inside the same claim — the durable
+      // count a failure policy needs (see `OutboxClaimedEvent.attempts`).
+      claimed.push({
+        event: entry.event,
+        fencingToken: entry.fenceToken,
+        attempts: entry.attempts,
+      });
     }
     return claimed;
   }

@@ -77,6 +77,20 @@ export interface OutboxClaimOptions {
 export interface OutboxClaimedEvent {
   readonly event: DomainEvent;
   readonly fencingToken: number;
+  /**
+   * DURABLE delivery-attempt count for this event, INCLUDING the claim that
+   * returned it (1 on the first claim). Optional: stores that persist a
+   * per-row counter report it; stores that don't leave it absent.
+   *
+   * Why it exists: a relay can only count failures in its own memory, and
+   * that count is wrong in exactly the cases a failure policy exists for.
+   * A poison event that crashes the relay restarts at 1 on every boot, so
+   * `attempts >= 5 → deadLetter` never fires; and across N relays sharing a
+   * store, each counts its own attempts, so "5" means 5×N. The store already
+   * increments a counter atomically inside the claim — reporting it here is
+   * what lets the policy see the true number.
+   */
+  readonly attempts?: number;
 }
 
 /** Options for {@link OutboxStore.acknowledge}. */
@@ -124,9 +138,12 @@ export interface OutboxFailureContext {
   readonly error: Error;
 
   /**
-   * Attempt count including this failure (1 on the first fail). Tracked
-   * in-process by the relay; accurate within a single relay process, resets
-   * on restart. For durable attempt counts, the policy can query the store.
+   * Attempt count including this failure (1 on the first fail).
+   *
+   * DURABLE when the store reports {@link OutboxClaimedEvent.attempts} from a
+   * fenced claim — survives relay restarts and is shared by every relay on the
+   * store. Otherwise the relay's in-process count: accurate within one relay
+   * process, reset on restart. Relays take the larger of the two.
    */
   readonly attempts: number;
 }

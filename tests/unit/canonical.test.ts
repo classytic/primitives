@@ -19,6 +19,17 @@ describe('canonicalJson', () => {
     expect(canonicalJson([3, 1, 2])).toBe('[3,1,2]');
   });
 
+  it('accepts 100 levels and refuses the 101st — a typed error, never a stack overflow', () => {
+    const nest = (levels: number) => {
+      let v: unknown = 1;
+      for (let i = 0; i < levels; i++) v = [v];
+      return v;
+    };
+    expect(() => canonicalJson(nest(100))).not.toThrow();
+    expect(() => canonicalJson(nest(101))).toThrow(CanonicalizeError);
+    expect(() => canonicalJson(nest(50_000))).toThrow(CanonicalizeError);
+  });
+
   it('serializes Date explicitly so timestamps participate in the digest', () => {
     const a = canonicalJson({ at: new Date('2026-07-24T00:00:00.000Z') });
     const b = canonicalJson({ at: new Date('2026-07-24T00:00:01.000Z') });

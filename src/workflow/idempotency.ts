@@ -1,4 +1,8 @@
 /**
+ * @deprecated Moved to `@classytic/repo-core/idempotency` — the claim contract plus its store
+ * port, `runIdempotent`, the reference store and the conformance suite, beside `./lock`. This
+ * copy has no consumers and is removed in the next minor.
+ *
  * Idempotency claim + lease — the CONTRACT, not the store.
  *
  * ## Why this exists

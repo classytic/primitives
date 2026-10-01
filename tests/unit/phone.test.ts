@@ -3,8 +3,11 @@ import {
   formatNational,
   formatPhone,
   isPhoneNumber,
+  isPlaceholderPhone,
   PhoneError,
   parsePhone,
+  placeholderPhone,
+  shownPhone,
 } from '../../src/identity/phone.js';
 
 describe('parsePhone', () => {
@@ -117,5 +120,25 @@ describe('isPhoneNumber', () => {
   it('returns false for null / undefined', () => {
     expect(isPhoneNumber(null)).toBe(false);
     expect(isPhoneNumber(undefined)).toBe(false);
+  });
+});
+
+describe('placeholder phone', () => {
+  it('mints and recognises the placeholder a phone-less record carries', () => {
+    const p = placeholderPhone('6ab58505c3bc53b73001f700');
+    expect(p).toBe('pending_6ab58505c3bc53b73001f700');
+    expect(isPlaceholderPhone(p)).toBe(true);
+    expect(isPlaceholderPhone(`  ${p} `)).toBe(true);
+  });
+
+  it.each([['+8801711111111'], ['01711111111'], [''], [null], [undefined], [42]])('%j is not a placeholder', (v) => {
+    expect(isPlaceholderPhone(v)).toBe(false);
+  });
+
+  it('shownPhone keeps a real number and drops empty or placeholder values', () => {
+    expect(shownPhone(' 01711111111 ')).toBe('01711111111');
+    expect(shownPhone('pending_abc')).toBeNull();
+    expect(shownPhone('   ')).toBeNull();
+    expect(shownPhone(undefined)).toBeNull();
   });
 });

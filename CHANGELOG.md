@@ -3,6 +3,69 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.29.0 — Unreleased
+
+### Added — `diffEventSchema` (`./events`)
+Compares two versions of an event payload's JSON Schema and marks each change breaking or not
+for an existing CONSUMER (forward compatibility): a required field removed, a field made optional,
+a widened type or enum break; additions and narrowing do not. Payloads are open for extension, so
+`additionalProperties: false` is disregarded. Nested objects, array items and record values recurse.
+
+### Added — `createEventRouter` (`./events`)
+An index over event subscriptions with `matchEventPattern`'s exact semantics — same values, same
+order, deduped — in amortized O(1) per route: candidates are only the name's separator prefixes,
+and results are memoized per name (bounded) until `add`/`remove`. Pinned by a property test
+against the scan. Transports and graph analyses route through it instead of scanning.
+
+### Added — `readEnv`: strict configuration reads (`./environment`)
+`readEnv(process.env)` → `bool | int | number | oneOf | list`, plus `InvalidEnvError`. Unset or
+blank → the declared default; a value that is SET but unrecognised throws, naming the variable
+and what it accepts. Booleans take `true/false`, `1/0`, `yes/no`, `on/off`; numbers take bounds.
+A hand-rolled `=== 'true'` or `parseInt` widens a typo to the default and says nothing.
+
+### Added — placeholder phone, one definition (`./phone`)
+`PLACEHOLDER_PHONE_PREFIX`, `placeholderPhone(id)`, `isPlaceholderPhone(v)`, `shownPhone(v)`.
+A record whose `phone` is required and unique but unknown stores `pending_<id>`; the writer
+(`@spinekit/order`) and every reader (be-prod party linking, the SDK, commerce-ui, pos-ui,
+the storefront) now share this instead of five hand-written `startsWith('pending_')`.
+
+### Deprecated: `@classytic/primitives/idempotency` — moved to `@classytic/repo-core/idempotency`
+
+The claim contract had no consumers here. It now lives beside `repo-core/lock` with its store
+port, `runIdempotent`, the reference store and the conformance suite, so every persistence kit
+implements it without depending on this package. Removed in the next minor.
+
+### Changed: `canonicalJson` refuses nesting deeper than 100 levels
+
+`MAX_CANONICAL_DEPTH` (MongoDB's document limit). Deeper input throws `CanonicalizeError`
+instead of recursing — a hostile input used to overflow the stack.
+
+### Added: `@classytic/primitives/line-settlement` (incl. `shareOfSettled`)
+
+One definition of "how much of this document line is still open". A line's
+quantity splits into kernel-named outcome buckets (fulfilled / returned /
+received / written off …); `outstandingOf`, `settlementState`,
+`documentSettlementState` and `settledEntirelyIn` derive the rest, and
+`planSettlement` REFUSES a non-integer or over-outstanding quantity instead of
+trimming it (`clampSettlement` exists for surfaces whose contract is "take what
+fits"). Order, flow, purchase and transfer each derived this by hand; transfer
+adopts it first.
+
+### Added: `OutboxClaimedEvent.attempts`, the durable attempt count
+
+`OutboxFailureContext.attempts` was documented as "tracked in-process by the
+relay; resets on restart", and that is exactly where a failure policy is wrong.
+`attempts >= 5 → deadLetter` never fired for a poison event that crashes the
+relay (it came back at 1 on every boot), and across N relays sharing a store it
+meant 5×N deliveries. Stores already increment a per-row counter atomically
+inside the claim; they had no way to report it.
+
+`OutboxClaimedEvent` (the fenced-claim result) gains an optional
+`attempts?: number`, which counts every claim including the one that returned it.
+`MemoryOutboxStore` reports it. Optional and additive: stores that don't count
+leave it absent, and relays fall back to their own count and take the larger of
+the two.
+
 ## 0.28.0
 
 ### Added: a `pass` monetization kind (paid once, grants a term, never renews)

@@ -101,3 +101,100 @@ export function classifyEnv(env: string | undefined | null): EnvClass {
 export function isProductionEnv(env: string | undefined | null): boolean {
   return classifyEnv(env) === 'production';
 }
+
+/** A variable was SET to a value its reader does not accept. Names the variable and what it takes. */
+export class InvalidEnvError extends Error {
+  readonly code = 'INVALID_ENV';
+  readonly variable: string;
+  readonly value: string;
+  readonly accepted: string;
+  constructor(variable: string, value: string, accepted: string) {
+    super(`${variable}=${JSON.stringify(value)} is not valid — expected ${accepted}.`);
+    this.name = 'InvalidEnvError';
+    this.variable = variable;
+    this.value = value;
+    this.accepted = accepted;
+  }
+}
+
+/** A typed reader over an env record. Every method: unset or blank → the fallback; set but unrecognised → throws. */
+export interface EnvReader {
+  bool(name: string, fallback: boolean): boolean;
+  /** A whole number. A fallback of `undefined` makes the setting optional. */
+  int<F extends number | undefined>(name: string, fallback: F, bounds?: EnvBounds): number | F;
+  /** A finite decimal (a rate, a ratio). */
+  number<F extends number | undefined>(name: string, fallback: F, bounds?: EnvBounds): number | F;
+  oneOf<const T extends string>(name: string, allowed: readonly T[], fallback: T): T;
+  /** Comma-separated, trimmed, empty items dropped. Unset → `[]`. */
+  list(name: string): string[];
+}
+
+export interface EnvBounds {
+  min?: number;
+  max?: number;
+}
+
+function inBounds(
+  name: string,
+  v: string,
+  n: number,
+  { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER }: EnvBounds,
+  valid: (n: number) => boolean,
+  kind: string,
+): number {
+  if (!valid(n) || n < min || n > max)
+    throw new InvalidEnvError(name, v, `${kind} in [${min}, ${max}]`);
+  return n;
+}
+
+const TRUE = new Set(['true', '1', 'yes', 'on']);
+const FALSE = new Set(['false', '0', 'no', 'off']);
+
+/**
+ * Read configuration strictly: a value that is SET must mean something, or boot fails naming it.
+ * A typo must never read as the default — `FEATURE=ture` silently becoming `false` switches a
+ * feature off with nothing said.
+ */
+export function readEnv(env: Readonly<Record<string, string | undefined>>): EnvReader {
+  const raw = (name: string): string | undefined => {
+    const v = env[name]?.trim();
+    return v ? v : undefined;
+  };
+  return {
+    bool(name, fallback) {
+      const v = raw(name);
+      if (v === undefined) return fallback;
+      const lower = v.toLowerCase();
+      if (TRUE.has(lower)) return true;
+      if (FALSE.has(lower)) return false;
+      throw new InvalidEnvError(name, v, 'true | false (also 1 | 0, yes | no, on | off)');
+    },
+    int(name, fallback, bounds = {}) {
+      const v = raw(name);
+      if (v === undefined) return fallback;
+      const n = /^-?\d+$/.test(v) ? Number(v) : Number.NaN;
+      return inBounds(name, v, n, bounds, Number.isSafeInteger, 'an integer');
+    },
+    number(name, fallback, bounds = {}) {
+      const v = raw(name);
+      if (v === undefined) return fallback;
+      const n = /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : Number.NaN;
+      return inBounds(name, v, n, bounds, Number.isFinite, 'a number');
+    },
+    oneOf(name, allowed, fallback) {
+      const v = raw(name);
+      if (v === undefined) return fallback;
+      if ((allowed as readonly string[]).includes(v)) return v as (typeof allowed)[number];
+      throw new InvalidEnvError(name, v, allowed.join(' | '));
+    },
+    list(name) {
+      const v = raw(name);
+      return v
+        ? v
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+    },
+  };
+}

@@ -360,6 +360,30 @@ export function formatNational(phone: PhoneNumber): string {
   return `+${phone.callingCode} ${groups.join(' ')}`.trim();
 }
 
+/**
+ * Prefix of a stored PLACEHOLDER phone: a record whose `phone` is required and
+ * unique but was created before a number was known gets `pending_<id>`. It means
+ * "no number collected" — never a number to show, dial, dedupe or search on.
+ */
+export const PLACEHOLDER_PHONE_PREFIX = 'pending_';
+
+/** Mint the placeholder for a phone-less record — unique per `id`. */
+export function placeholderPhone(id: string): string {
+  return `${PLACEHOLDER_PHONE_PREFIX}${id}`;
+}
+
+/** True for a stored placeholder (see {@link PLACEHOLDER_PHONE_PREFIX}); whitespace-tolerant. */
+export function isPlaceholderPhone(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().startsWith(PLACEHOLDER_PHONE_PREFIX);
+}
+
+/** A stored phone worth showing: trimmed, or `null` for empty or a placeholder. */
+export function shownPhone(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const v = value.trim();
+  return v && !isPlaceholderPhone(v) ? v : null;
+}
+
 /** Type guard. */
 export function isPhoneNumber(value: unknown): value is PhoneNumber {
   return (

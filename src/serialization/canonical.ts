@@ -33,7 +33,13 @@ export class CanonicalizeError extends Error {
   }
 }
 
-function canonicalize(value: unknown, seen: WeakSet<object>): string {
+/**
+ * Deepest nesting canonicalized — MongoDB's own document limit. Deeper input is refused
+ * rather than recursed: it may be hostile (a request body), and recursion would blow the stack.
+ */
+export const MAX_CANONICAL_DEPTH = 100;
+
+function canonicalize(value: unknown, seen: WeakSet<object>, depth = 0): string {
   if (value === null) return 'null';
 
   const t = typeof value;
@@ -62,11 +68,14 @@ function canonicalize(value: unknown, seen: WeakSet<object>): string {
   }
 
   const obj = value as object;
+  if (depth >= MAX_CANONICAL_DEPTH) {
+    throw new CanonicalizeError(`nesting deeper than ${MAX_CANONICAL_DEPTH} levels`);
+  }
   if (seen.has(obj)) throw new CanonicalizeError('cyclic reference');
   seen.add(obj);
   try {
     if (Array.isArray(value)) {
-      return `[${value.map((v) => canonicalize(v, seen)).join(',')}]`;
+      return `[${value.map((v) => canonicalize(v, seen, depth + 1)).join(',')}]`;
     }
     /**
      * Reject CLASS INSTANCES — the silent-collapse hole.
@@ -93,7 +102,7 @@ function canonicalize(value: unknown, seen: WeakSet<object>): string {
     }
     const rec = value as Record<string, unknown>;
     const keys = Object.keys(rec).sort();
-    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalize(rec[k], seen)}`).join(',')}}`;
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalize(rec[k], seen, depth + 1)}`).join(',')}}`;
   } finally {
     seen.delete(obj);
   }

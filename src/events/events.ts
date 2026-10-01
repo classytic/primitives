@@ -394,3 +394,255 @@ function randomEventId(): string {
     return v.toString(16);
   });
 }
+
+// ── Routing ─────────────────────────────────────────────────────────────────
+
+/**
+ * Subscriptions indexed for dispatch — the same answer as scanning every pattern with
+ * `matchEventPattern` (same values, same order: first occurrence by pattern registration,
+ * deduped), in amortized O(1) per event instead of O(patterns).
+ *
+ * A wildcard can only match at a separator, so an event name has at most one candidate prefix
+ * per `.`/`:` — a lookup walks its own name, never the subscription table. Resolved lists are
+ * memoized per name (names are a small, closed set) and dropped on any add/remove.
+ */
+export interface EventRouter<T> {
+  add(pattern: string, value: T): void;
+  /** `true` when the pair was registered. A pattern left with no values is dropped. */
+  remove(pattern: string, value: T): boolean;
+  /** Every value whose pattern matches `type` — registration order, each value once. */
+  route(type: string): readonly T[];
+  clear(): void;
+  /** Registered patterns, in registration order. */
+  patterns(): IterableIterator<[string, ReadonlySet<T>]>;
+  /** Number of registered patterns. */
+  readonly size: number;
+}
+
+/** Past this many distinct names the memo is reset — dynamic names must not grow it without bound. */
+const ROUTE_MEMO_LIMIT = 4096;
+
+export function createEventRouter<T>(): EventRouter<T> {
+  // Insertion-ordered, exactly like the Map a scanning transport iterates.
+  const byPattern = new Map<string, Set<T>>();
+  const order = new Map<string, number>();
+  let seq = 0;
+  const memo = new Map<string, readonly T[]>();
+
+  const resolve = (type: string): readonly T[] => {
+    const hits: string[] = [];
+    if (byPattern.has('*')) hits.push('*');
+    if (byPattern.has(type)) hits.push(type);
+    for (let i = 0; i < type.length; i++) {
+      const c = type.charCodeAt(i);
+      if (c !== 46 /* . */ && c !== 58 /* : */) continue;
+      const wildcard = `${type.slice(0, i + 1)}*`;
+      if (wildcard !== type && byPattern.has(wildcard)) hits.push(wildcard);
+    }
+    if (hits.length > 1) hits.sort((a, b) => (order.get(a) as number) - (order.get(b) as number));
+    const seen = new Set<T>();
+    for (const pattern of hits) for (const v of byPattern.get(pattern) as Set<T>) seen.add(v);
+    return Object.freeze([...seen]);
+  };
+
+  return {
+    add(pattern, value) {
+      let set = byPattern.get(pattern);
+      if (!set) {
+        set = new Set();
+        byPattern.set(pattern, set);
+        order.set(pattern, seq++);
+      }
+      if (!set.has(value)) {
+        set.add(value);
+        memo.clear();
+      }
+    },
+    remove(pattern, value) {
+      const set = byPattern.get(pattern);
+      if (!set?.delete(value)) return false;
+      if (set.size === 0) {
+        byPattern.delete(pattern);
+        order.delete(pattern);
+      }
+      memo.clear();
+      return true;
+    },
+    route(type) {
+      const cached = memo.get(type);
+      if (cached) return cached;
+      const resolved = resolve(type);
+      if (memo.size >= ROUTE_MEMO_LIMIT) memo.clear();
+      memo.set(type, resolved);
+      return resolved;
+    },
+    clear() {
+      byPattern.clear();
+      order.clear();
+      memo.clear();
+    },
+    patterns: () => byPattern.entries(),
+    get size() {
+      return byPattern.size;
+    },
+  };
+}
+
+// ── Contract evolution ──────────────────────────────────────────────────────
+
+/** One difference between two versions of an event's payload schema. */
+export interface EventSchemaChange {
+  /** Dotted path to the field (`''` = the payload root; `[]` = array items; `{}` = record values). */
+  readonly path: string;
+  readonly kind:
+    | 'added'
+    | 'removed'
+    | 'now-optional'
+    | 'type-widened'
+    | 'type-narrowed'
+    | 'values-widened'
+    | 'values-narrowed';
+  /** Would a consumer written against the OLD schema break on a payload valid under the NEW one? */
+  readonly breaking: boolean;
+  readonly detail: string;
+}
+
+type JsonSchemaNode = {
+  type?: string | string[];
+  const?: unknown;
+  enum?: unknown[];
+  anyOf?: JsonSchemaNode[];
+  oneOf?: JsonSchemaNode[];
+  properties?: Record<string, JsonSchemaNode>;
+  required?: string[];
+  items?: JsonSchemaNode;
+  additionalProperties?: boolean | JsonSchemaNode;
+};
+
+const jsonType = (v: unknown): string =>
+  v === null ? 'null' : Array.isArray(v) ? 'array' : Number.isInteger(v) ? 'integer' : typeof v;
+
+/** The JSON types a node admits; `null` means unconstrained. */
+function typesOf(node: JsonSchemaNode): Set<string> | null {
+  const branches = node.anyOf ?? node.oneOf;
+  if (branches) {
+    const all = new Set<string>();
+    for (const b of branches) {
+      const t = typesOf(b);
+      if (t === null) return null;
+      for (const x of t) all.add(x);
+    }
+    return all;
+  }
+  if (node.const !== undefined) return new Set([jsonType(node.const)]);
+  if (node.enum) return new Set(node.enum.map(jsonType));
+  if (node.type === undefined) return null;
+  return new Set([node.type].flat());
+}
+
+/** The finite values a node admits (`enum` / `const`), or `null` when open. */
+function valuesOf(node: JsonSchemaNode): Set<string> | null {
+  if (node.const !== undefined) return new Set([JSON.stringify(node.const)]);
+  if (node.enum) return new Set(node.enum.map((v) => JSON.stringify(v)));
+  return null;
+}
+
+/** `integer` is a kind of `number`. */
+const admits = (types: Set<string>, t: string): boolean =>
+  types.has(t) || (t === 'integer' && types.has('number'));
+
+/**
+ * What changed between two versions of an event payload's JSON Schema, and whether each change
+ * breaks an existing CONSUMER (forward compatibility: the producer evolves, old consumers keep
+ * reading). Payloads are open for extension — adding a field never breaks, whatever
+ * `additionalProperties` says, because consumers ignore fields they do not know.
+ */
+export function diffEventSchema(before: unknown, after: unknown, path = ''): EventSchemaChange[] {
+  const a = (before ?? {}) as JsonSchemaNode;
+  const b = (after ?? {}) as JsonSchemaNode;
+  const changes: EventSchemaChange[] = [];
+  const at = (field: string) => (path ? `${path}.${field}` : field);
+
+  const ta = typesOf(a);
+  const tb = typesOf(b);
+  if (tb === null ? ta !== null : ta !== null && [...tb].some((t) => !admits(ta, t))) {
+    changes.push({
+      path,
+      kind: 'type-widened',
+      breaking: true,
+      detail: `${ta ? [...ta].join('|') : 'any'} → ${tb ? [...tb].join('|') : 'any'}`,
+    });
+  } else if (ta !== null && tb !== null && [...ta].some((t) => !admits(tb, t))) {
+    changes.push({
+      path,
+      kind: 'type-narrowed',
+      breaking: false,
+      detail: `${[...ta].join('|')} → ${[...tb].join('|')}`,
+    });
+  }
+
+  const va = valuesOf(a);
+  const vb = valuesOf(b);
+  if (va !== null) {
+    const added = vb === null ? ['(any)'] : [...vb].filter((v) => !va.has(v));
+    const removed = vb === null ? [] : [...va].filter((v) => !vb.has(v));
+    if (added.length > 0) {
+      changes.push({
+        path,
+        kind: 'values-widened',
+        breaking: true,
+        detail: `new values ${added.join(', ')}`,
+      });
+    }
+    if (removed.length > 0) {
+      changes.push({
+        path,
+        kind: 'values-narrowed',
+        breaking: false,
+        detail: `dropped ${removed.join(', ')}`,
+      });
+    }
+  }
+
+  const pa = a.properties ?? {};
+  const pb = b.properties ?? {};
+  const ra = new Set(a.required ?? []);
+  const rb = new Set(b.required ?? []);
+  for (const field of Object.keys(pa)) {
+    if (!(field in pb)) {
+      const required = ra.has(field);
+      changes.push({
+        path: at(field),
+        kind: 'removed',
+        breaking: required,
+        detail: required ? 'required field removed' : 'optional field removed',
+      });
+      continue;
+    }
+    if (ra.has(field) && !rb.has(field)) {
+      changes.push({
+        path: at(field),
+        kind: 'now-optional',
+        breaking: true,
+        detail: 'was required',
+      });
+    }
+    changes.push(...diffEventSchema(pa[field], pb[field], at(field)));
+  }
+  for (const field of Object.keys(pb)) {
+    if (!(field in pa)) {
+      changes.push({
+        path: at(field),
+        kind: 'added',
+        breaking: false,
+        detail: rb.has(field) ? 'required' : 'optional',
+      });
+    }
+  }
+
+  if (a.items || b.items) changes.push(...diffEventSchema(a.items, b.items, `${path}[]`));
+  const aa = typeof a.additionalProperties === 'object' ? a.additionalProperties : undefined;
+  const ba = typeof b.additionalProperties === 'object' ? b.additionalProperties : undefined;
+  if (aa || ba) changes.push(...diffEventSchema(aa, ba, `${path}{}`));
+  return changes;
+}
