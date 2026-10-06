@@ -170,6 +170,30 @@ function requirePart(result: SplitResult, id: string): number {
 }
 
 /**
+ * The share of `total` carried by `part` of `whole`, in integer minor units — the VAT on a partial
+ * refund, the tax on one tender of a split sale. Largest-remainder rounding, so the share and its
+ * complement sum to `total` exactly; `part === whole` returns `total` untouched.
+ *
+ * @throws ProrationError('INVALID_FRACTION') when an input is not an integer, `whole` is not
+ *   positive, or `part` lies outside `[0, whole]` — a refund larger than its payment is a defect
+ *   upstream, and clamping it would book a plausible number.
+ */
+export function apportion(total: number, part: number, whole: number): number {
+  if (![total, part, whole].every(Number.isInteger) || whole <= 0 || part < 0 || part > whole) {
+    throw new ProrationError('INVALID_FRACTION', `cannot apportion ${total} by ${part} of ${whole}`);
+  }
+  const result = allocate(
+    total,
+    [
+      { id: 'part', weight: part },
+      { id: 'rest', weight: whole - part },
+    ],
+    'by-weight',
+  );
+  return requirePart(result, 'part');
+}
+
+/**
  * Allocate the `fraction`-weighted part of a `Money` amount, drift-free — the
  * complement (`1 - fraction`) is discarded but computed so rounding is exact
  * against the whole. `fraction` must be in `[0, 1]`.

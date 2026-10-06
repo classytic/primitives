@@ -366,3 +366,26 @@ describe('shiftPeriod', () => {
     expect(() => shiftPeriod({ year: 2026, month: 3, timezone: DHAKA }, 1.5)).toThrow(PeriodError);
   });
 });
+
+describe('fiscalYearOf', () => {
+  it('Bangladesh (July start): the last Dhaka evening of June is still the old year', async () => {
+    const { fiscalYearOf } = await import('../../src/scheduling/period.js');
+    const july = { startMonth: 7, timezone: 'Asia/Dhaka' };
+    expect(fiscalYearOf(new Date('2026-06-30T17:59:00Z'), july).label).toBe('2025-26');
+    const fy = fiscalYearOf(new Date('2026-06-30T18:00:00Z'), july);
+    expect(fy).toMatchObject({ startYear: 2026, label: '2026-27' });
+    expect(fy.range.start.toISOString()).toBe('2026-06-30T18:00:00.000Z');
+    expect(fy.range.end.toISOString()).toBe('2027-06-30T18:00:00.000Z');
+  });
+
+  it('India (April start) and a January start', async () => {
+    const { fiscalYearOf } = await import('../../src/scheduling/period.js');
+    expect(fiscalYearOf(new Date('2026-03-31T12:00:00Z'), { startMonth: 4, timezone: 'Asia/Kolkata' }).label).toBe('2025-26');
+    expect(fiscalYearOf(new Date('2026-05-01T12:00:00Z'), { startMonth: 1, timezone: 'UTC' }).label).toBe('2026');
+  });
+
+  it('a century boundary keeps two digits', async () => {
+    const { fiscalYearOf } = await import('../../src/scheduling/period.js');
+    expect(fiscalYearOf(new Date('2099-12-31T00:00:00Z'), { startMonth: 7, timezone: 'UTC' }).label).toBe('2099-00');
+  });
+});

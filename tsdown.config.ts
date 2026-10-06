@@ -34,6 +34,7 @@ export default defineConfig({
     person: 'src/identity/person.ts',
     'person-parse': 'src/identity/person-parse.ts',
     subject: 'src/identity/subject.ts',
+    'legal-form': 'src/identity/legal-form.ts',
     address: 'src/identity/address.ts',
     phone: 'src/identity/phone.ts',
     'identity-verification': 'src/identity/identity-verification.ts',

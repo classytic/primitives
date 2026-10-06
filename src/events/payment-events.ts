@@ -147,6 +147,9 @@ export interface PaymentRefundedPayload {
   refundId: string;
   providerRef?: string;
   providerCode: string;
+  /** How the original payment moved — money goes back the way it came, so this places the refund too. */
+  methodKind: PaymentMethodKind;
+  methodCode?: string;
   /** Amount refunded in this event — may be less than the original payment. */
   refundedAmount: Money;
   /** Original payment total — present so consumers can compute remaining refundable without a Payment lookup. */
@@ -171,6 +174,9 @@ export interface PaymentReversedPayload {
   paymentId: string;
   providerRef?: string;
   providerCode: string;
+  /** How the payment being unwound moved. */
+  methodKind: PaymentMethodKind;
+  methodCode?: string;
   /** Amount being unwound — equals the original payment for full reversal, less for partial. */
   reversedAmount: Money;
   /** Original payment total — present so consumers can detect partial vs full without a Payment lookup. */

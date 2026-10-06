@@ -218,6 +218,10 @@
       "types": "./dist/suspension.d.mts",
       "default": "./dist/suspension.mjs"
     },
+    "./legal-form": {
+      "types": "./dist/legal-form.d.mts",
+      "default": "./dist/legal-form.mjs"
+    },
     "./subject": {
       "types": "./dist/subject.d.mts",
       "default": "./dist/subject.mjs"

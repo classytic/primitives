@@ -9,6 +9,7 @@ import type { Money } from '../../src/money/money.js';
 import {
   ProrationError,
   allocateMoneyByFraction,
+  apportion,
   periodProgress,
   splitByPeriodFraction,
 } from '../../src/money/proration.js';
@@ -102,5 +103,31 @@ describe('allocateMoneyByFraction', () => {
   it('rejects a fraction outside [0, 1]', () => {
     expect(() => allocateMoneyByFraction(money(100), 1.5)).toThrow(ProrationError);
     expect(() => allocateMoneyByFraction(money(100), -0.1)).toThrow(ProrationError);
+  });
+});
+
+describe('apportion', () => {
+  it('a partial refund carries its own share of the tax, never the whole payment tax', () => {
+    expect(apportion(13_043, 100, 100_000)).toBe(13);
+    expect(apportion(13_043, 50_000, 100_000)).toBe(6_522);
+  });
+
+  it('the share and its complement sum to the total exactly', () => {
+    for (const part of [1, 333, 33_333, 66_667, 99_999]) {
+      expect(apportion(13_043, part, 100_000) + apportion(13_043, 100_000 - part, 100_000)).toBe(13_043);
+    }
+  });
+
+  it('the whole carries the whole total, nothing carries nothing', () => {
+    expect(apportion(13_043, 100_000, 100_000)).toBe(13_043);
+    expect(apportion(13_043, 0, 100_000)).toBe(0);
+    expect(apportion(0, 500, 100_000)).toBe(0);
+  });
+
+  it('refuses a part larger than its whole, a non-positive whole, and fractions of a minor unit', () => {
+    expect(() => apportion(13_043, 100_001, 100_000)).toThrow(ProrationError);
+    expect(() => apportion(13_043, 0, 0)).toThrow(ProrationError);
+    expect(() => apportion(13_043, -1, 100_000)).toThrow(ProrationError);
+    expect(() => apportion(130.5, 100, 1_000)).toThrow(ProrationError);
   });
 });
