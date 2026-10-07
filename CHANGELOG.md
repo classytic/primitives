@@ -5,6 +5,27 @@ adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## 0.29.0 — Unreleased
 
+### Added — `./signed-token`: ES256 compact JWS over WebCrypto
+`signToken` / `verifyToken` for a server and an offline device, no dependency. `typ` is required on both
+sides and a token without `exp` is refused; every failure is a named refusal (`bad_signature`,
+`wrong_type`, `unknown_key`, `expired`, …), never a throw. Signing keys import non-extractable.
+Pinned by `tests/unit/signed-token.test.ts` (the expiry rule is falsified).
+
+### Added — `itemStockOf` (`./item-stock`): one item's stock, the one summary every reader shows
+`itemStockOf(item, rowOf, { defaultReorderPoint })` builds `{ quantity, inStock, lowStock, valueMinor?,
+variants? }` from rows filed under stock keys (`stockKeyFor`). A row reached by both the item-level
+and a variant lookup counts once; production's sole variant keys by the product id. It is pure and
+browser-safe, so the server's catalog bridge and an offline till compute the same answer. Pinned by
+`tests/unit/item-stock.test.ts`; collapsing the row de-duplication fails three of its cases.
+
+### Added — maker-checker on `ApprovalChain` (`./approval`)
+`ApprovalChain.request` (`{ by, at, basis? }`) records who asked and what the approval covers.
+`attachRequest(chain, request)` removes the requester from every step's approvers and throws
+`NO_INDEPENDENT_APPROVER` when a step is left below its quorum. `applyDecision` throws
+`SELF_APPROVAL` when the requester approves (rejecting their own request — a withdrawal — is
+allowed). `applyDecision` and `skipStep` now preserve `request` and `notRequiredReason` instead of
+rebuilding the chain from `{ order, steps, status }`.
+
 ### Added — `diffEventSchema` (`./events`)
 Compares two versions of an event payload's JSON Schema and marks each change breaking or not
 for an existing CONSUMER (forward compatibility): a required field removed, a field made optional,

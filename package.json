@@ -1,7 +1,7 @@
 {
   "name": "@classytic/primitives",
   "version": "0.29.0",
-  "description": "Framework-agnostic TypeScript primitives shared across Classytic packages \u2014 Money, events, pagination, tenant config, and other building blocks.",
+  "description": "Framework-agnostic TypeScript primitives shared across Classytic packages — Money, events, pagination, tenant config, and other building blocks.",
   "author": "Classytic",
   "license": "MIT",
   "homepage": "https://www.npmjs.com/package/@classytic/primitives",
@@ -22,227 +22,293 @@
   },
   "exports": {
     "./money": {
+      "@classytic/source": "./src/money/money.ts",
       "types": "./dist/money.d.mts",
       "default": "./dist/money.mjs"
     },
     "./currency": {
+      "@classytic/source": "./src/money/currency.ts",
       "types": "./dist/currency.d.mts",
       "default": "./dist/currency.mjs"
     },
     "./unit-cost-rate": {
+      "@classytic/source": "./src/money/unit-cost-rate.ts",
       "types": "./dist/unit-cost-rate.d.mts",
       "default": "./dist/unit-cost-rate.mjs"
     },
     "./price-basis": {
+      "@classytic/source": "./src/money/price-basis.ts",
       "types": "./dist/price-basis.d.mts",
       "default": "./dist/price-basis.mjs"
     },
     "./address": {
+      "@classytic/source": "./src/identity/address.ts",
       "types": "./dist/address.d.mts",
       "default": "./dist/address.mjs"
     },
     "./period": {
+      "@classytic/source": "./src/scheduling/period.ts",
       "types": "./dist/period.d.mts",
       "default": "./dist/period.mjs"
     },
     "./calendar": {
+      "@classytic/source": "./src/scheduling/calendar.ts",
       "types": "./dist/calendar.d.mts",
       "default": "./dist/calendar.mjs"
     },
     "./calendar-facts": {
+      "@classytic/source": "./src/scheduling/calendar-facts.ts",
       "types": "./dist/calendar-facts.d.mts",
       "default": "./dist/calendar-facts.mjs"
     },
     "./timezone": {
+      "@classytic/source": "./src/scheduling/timezone.ts",
       "types": "./dist/timezone.d.mts",
       "default": "./dist/timezone.mjs"
     },
     "./reference": {
+      "@classytic/source": "./src/composition/reference.ts",
       "types": "./dist/reference.d.mts",
       "default": "./dist/reference.mjs"
     },
     "./fault-attribution": {
+      "@classytic/source": "./src/composition/fault-attribution.ts",
       "types": "./dist/fault-attribution.d.mts",
       "default": "./dist/fault-attribution.mjs"
     },
     "./context": {
+      "@classytic/source": "./src/composition/context.ts",
       "types": "./dist/context.d.mts",
       "default": "./dist/context.mjs"
     },
     "./environment": {
+      "@classytic/source": "./src/composition/environment.ts",
       "types": "./dist/environment.d.mts",
       "default": "./dist/environment.mjs"
     },
     "./events": {
+      "@classytic/source": "./src/events/events.ts",
       "types": "./dist/events.d.mts",
       "default": "./dist/events.mjs"
     },
     "./memory-outbox": {
+      "@classytic/source": "./src/events/memory-outbox.ts",
       "types": "./dist/memory-outbox.d.mts",
       "default": "./dist/memory-outbox.mjs"
     },
     "./event-infra": {
+      "@classytic/source": "./src/events/event-infra.ts",
       "types": "./dist/event-infra.d.mts",
       "default": "./dist/event-infra.mjs"
     },
     "./outbox": {
+      "@classytic/source": "./src/events/outbox.ts",
       "types": "./dist/outbox.d.mts",
       "default": "./dist/outbox.mjs"
     },
     "./result": {
+      "@classytic/source": "./src/composition/result.ts",
       "types": "./dist/result.d.mts",
       "default": "./dist/result.mjs"
     },
     "./brand": {
+      "@classytic/source": "./src/composition/brand.ts",
       "types": "./dist/brand.d.mts",
       "default": "./dist/brand.mjs"
     },
     "./split-allocation": {
+      "@classytic/source": "./src/money/split-allocation.ts",
       "types": "./dist/split-allocation.d.mts",
       "default": "./dist/split-allocation.mjs"
     },
     "./approval": {
+      "@classytic/source": "./src/workflow/approval.ts",
       "types": "./dist/approval.d.mts",
       "default": "./dist/approval.mjs"
     },
     "./idempotency": {
+      "@classytic/source": "./src/workflow/idempotency.ts",
       "types": "./dist/idempotency.d.mts",
       "default": "./dist/idempotency.mjs"
     },
     "./cadence": {
+      "@classytic/source": "./src/scheduling/cadence.ts",
       "types": "./dist/cadence.d.mts",
       "default": "./dist/cadence.mjs"
     },
     "./hold": {
+      "@classytic/source": "./src/workflow/hold.ts",
       "types": "./dist/hold.d.mts",
       "default": "./dist/hold.mjs"
     },
     "./sla": {
+      "@classytic/source": "./src/scheduling/sla.ts",
       "types": "./dist/sla.d.mts",
       "default": "./dist/sla.mjs"
     },
     "./shelf-life": {
+      "@classytic/source": "./src/scheduling/shelf-life.ts",
       "types": "./dist/shelf-life.d.mts",
       "default": "./dist/shelf-life.mjs"
     },
     "./person": {
+      "@classytic/source": "./src/identity/person.ts",
       "types": "./dist/person.d.mts",
       "default": "./dist/person.mjs"
     },
     "./person-parse": {
+      "@classytic/source": "./src/identity/person-parse.ts",
       "types": "./dist/person-parse.d.mts",
       "default": "./dist/person-parse.mjs"
     },
     "./identity-verification": {
+      "@classytic/source": "./src/identity/identity-verification.ts",
       "types": "./dist/identity-verification.d.mts",
       "default": "./dist/identity-verification.mjs"
     },
     "./otp": {
+      "@classytic/source": "./src/identity/otp.ts",
       "types": "./dist/otp.d.mts",
       "default": "./dist/otp.mjs"
     },
     "./state-machine": {
+      "@classytic/source": "./src/workflow/state-machine.ts",
       "types": "./dist/state-machine.d.mts",
       "default": "./dist/state-machine.mjs"
     },
     "./bank-transaction": {
+      "@classytic/source": "./src/money/bank-transaction.ts",
       "types": "./dist/bank-transaction.d.mts",
       "default": "./dist/bank-transaction.mjs"
     },
     "./payment-gateway": {
+      "@classytic/source": "./src/money/payment-gateway.ts",
       "types": "./dist/payment-gateway.d.mts",
       "default": "./dist/payment-gateway.mjs"
     },
     "./payment-method-kind": {
+      "@classytic/source": "./src/money/payment-method-kind.ts",
       "types": "./dist/payment-method-kind.d.mts",
       "default": "./dist/payment-method-kind.mjs"
     },
     "./payment-allocation-status": {
+      "@classytic/source": "./src/money/payment-allocation-status.ts",
       "types": "./dist/payment-allocation-status.d.mts",
       "default": "./dist/payment-allocation-status.mjs"
     },
     "./monetization": {
+      "@classytic/source": "./src/money/monetization.ts",
       "types": "./dist/monetization.d.mts",
       "default": "./dist/monetization.mjs"
     },
     "./proration": {
+      "@classytic/source": "./src/money/proration.ts",
       "types": "./dist/proration.d.mts",
       "default": "./dist/proration.mjs"
     },
     "./payment-events": {
+      "@classytic/source": "./src/events/payment-events.ts",
       "types": "./dist/payment-events.d.mts",
       "default": "./dist/payment-events.mjs"
     },
     "./phone": {
+      "@classytic/source": "./src/identity/phone.ts",
       "types": "./dist/phone.d.mts",
       "default": "./dist/phone.mjs"
     },
     "./status-history": {
+      "@classytic/source": "./src/workflow/status-history.ts",
       "types": "./dist/status-history.d.mts",
       "default": "./dist/status-history.mjs"
     },
     "./condition": {
+      "@classytic/source": "./src/workflow/condition.ts",
       "types": "./dist/condition.d.mts",
       "default": "./dist/condition.mjs"
     },
     "./mixin": {
+      "@classytic/source": "./src/composition/mixin.ts",
       "types": "./dist/mixin.d.mts",
       "default": "./dist/mixin.mjs"
     },
     "./deadline": {
+      "@classytic/source": "./src/composition/deadline.ts",
       "types": "./dist/deadline.d.mts",
       "default": "./dist/deadline.mjs"
     },
     "./sla-policy": {
+      "@classytic/source": "./src/scheduling/sla-policy.ts",
       "types": "./dist/sla-policy.d.mts",
       "default": "./dist/sla-policy.mjs"
     },
     "./retention": {
+      "@classytic/source": "./src/retention/purge-evidence.ts",
       "types": "./dist/retention.d.mts",
       "default": "./dist/retention.mjs"
     },
     "./canonical": {
+      "@classytic/source": "./src/serialization/canonical.ts",
       "types": "./dist/canonical.d.mts",
       "default": "./dist/canonical.mjs"
     },
     "./csv": {
+      "@classytic/source": "./src/serialization/csv.ts",
       "types": "./dist/csv.d.mts",
       "default": "./dist/csv.mjs"
     },
     "./package.json": "./package.json",
     "./state-diagram": {
+      "@classytic/source": "./src/workflow/state-diagram.ts",
       "types": "./dist/state-diagram.d.mts",
       "default": "./dist/state-diagram.mjs"
     },
     "./suspension": {
+      "@classytic/source": "./src/workflow/suspension.ts",
       "types": "./dist/suspension.d.mts",
       "default": "./dist/suspension.mjs"
     },
     "./legal-form": {
+      "@classytic/source": "./src/identity/legal-form.ts",
       "types": "./dist/legal-form.d.mts",
       "default": "./dist/legal-form.mjs"
     },
     "./subject": {
+      "@classytic/source": "./src/identity/subject.ts",
       "types": "./dist/subject.d.mts",
       "default": "./dist/subject.mjs"
     },
     "./item-identity": {
+      "@classytic/source": "./src/identity/item-identity.ts",
       "types": "./dist/item-identity.d.mts",
       "default": "./dist/item-identity.mjs"
     },
     "./stock-level": {
+      "@classytic/source": "./src/inventory/stock-level.ts",
       "types": "./dist/stock-level.d.mts",
       "default": "./dist/stock-level.mjs"
     },
+    "./signed-token": {
+      "@classytic/source": "./src/security/signed-token.ts",
+      "types": "./dist/signed-token.d.mts",
+      "default": "./dist/signed-token.mjs"
+    },
+    "./item-stock": {
+      "@classytic/source": "./src/inventory/item-stock.ts",
+      "types": "./dist/item-stock.d.mts",
+      "default": "./dist/item-stock.mjs"
+    },
     "./item-facts": {
+      "@classytic/source": "./src/inventory/item-facts.ts",
       "types": "./dist/item-facts.d.mts",
       "default": "./dist/item-facts.mjs"
     },
     "./line-settlement": {
+      "@classytic/source": "./src/inventory/line-settlement.ts",
       "types": "./dist/line-settlement.d.mts",
       "default": "./dist/line-settlement.mjs"
     },
     "./testing/stock-key-seam": {
+      "@classytic/source": "./src/testing/stock-key-seam.ts",
       "types": "./dist/testing/stock-key-seam.d.mts",
       "default": "./dist/testing/stock-key-seam.mjs"
     }

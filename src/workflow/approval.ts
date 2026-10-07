@@ -84,6 +84,16 @@ export interface ApprovalChain {
    * {@link isNotRequired} tests the structure instead, which no schema can drop.
    */
   readonly notRequiredReason?: string;
+  /** Who asked, when, and against what — set by {@link attachRequest}. The requester may not approve it. */
+  readonly request?: ApprovalRequest;
+}
+
+/** The maker of an approval request, and the basis it was approved against. */
+export interface ApprovalRequest {
+  readonly by: string;
+  readonly at: Date;
+  /** What the approval covers. A later amount above `basis.amount` is not covered. */
+  readonly basis?: { readonly amount?: number; readonly category?: string };
 }
 
 export interface CreateChainInput {
@@ -118,7 +128,11 @@ export type ApprovalErrorCode =
    *  `CHAIN_INCOMPLETE`: the chain is not unfinished, it is absent — the
    *  document never carried one, or a schema that never declared the field
    *  stripped it on write. See {@link assertApproved}. */
-  | 'CHAIN_MISSING';
+  | 'CHAIN_MISSING'
+  /** The requester tried to approve their own request (maker-checker). */
+  | 'SELF_APPROVAL'
+  /** Removing the requester left a step with fewer approvers than its quorum. */
+  | 'NO_INDEPENDENT_APPROVER';
 
 export class ApprovalError extends Error {
   override readonly name = 'ApprovalError';
@@ -224,6 +238,27 @@ export function notRequiredChain(reason: string): ApprovalChain {
 }
 
 /**
+ * Stamp the requester onto a chain and remove them from every step's approvers
+ * (maker-checker). A zero-step chain gets the request and nothing else.
+ *
+ * @throws ApprovalError `NO_INDEPENDENT_APPROVER` when a step is left with
+ *   fewer approvers than `requiredApprovals` — nobody else can approve it.
+ */
+export function attachRequest(chain: ApprovalChain, request: ApprovalRequest): ApprovalChain {
+  const steps = chain.steps.map((step) => {
+    const approvers = step.approvers.filter((a) => a.id !== request.by);
+    if (step.status === 'pending' && approvers.length < step.requiredApprovals) {
+      throw new ApprovalError(
+        'NO_INDEPENDENT_APPROVER',
+        `step ${step.id} needs ${step.requiredApprovals} approver(s) other than the requester ${request.by}; it has ${approvers.length}`,
+      );
+    }
+    return approvers.length === step.approvers.length ? step : { ...step, approvers };
+  });
+  return { ...chain, steps, request };
+}
+
+/**
  * Returns the next step awaiting a decision — or `null` if none.
  *
  * For `sequential` chains: the first `pending` step in order; later steps
@@ -279,6 +314,13 @@ export function applyDecision(chain: ApprovalChain, input: DecisionInput): Appro
     );
   }
 
+  if (input.decision === 'approved' && chain.request && chain.request.by === input.approverId) {
+    throw new ApprovalError(
+      'SELF_APPROVAL',
+      `approver ${input.approverId} requested this approval and may not approve it`,
+    );
+  }
+
   const approverAllowed = step.approvers.some((a) => a.id === input.approverId);
   if (!approverAllowed) {
     throw new ApprovalError(
@@ -307,11 +349,7 @@ export function applyDecision(chain: ApprovalChain, input: DecisionInput): Appro
   });
 
   const updatedSteps = chain.steps.map((s, i) => (i === stepIndex ? updatedStep : s));
-  return {
-    order: chain.order,
-    steps: updatedSteps,
-    status: computeChainStatus(updatedSteps),
-  };
+  return { ...chain, steps: updatedSteps, status: computeChainStatus(updatedSteps) };
 }
 
 /**
@@ -341,11 +379,7 @@ export function skipStep(chain: ApprovalChain, stepId: string, reason?: string):
     ...(reason !== undefined ? { skippedReason: reason } : {}),
   };
   const updatedSteps = chain.steps.map((s, i) => (i === stepIndex ? updatedStep : s));
-  return {
-    order: chain.order,
-    steps: updatedSteps,
-    status: computeChainStatus(updatedSteps),
-  };
+  return { ...chain, steps: updatedSteps, status: computeChainStatus(updatedSteps) };
 }
 
 export function isApproved(chain: ApprovalChain): boolean {

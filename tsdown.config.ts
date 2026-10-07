@@ -41,6 +41,8 @@ export default defineConfig({
     otp: 'src/identity/otp.ts',
     'item-identity': 'src/identity/item-identity.ts',
     'stock-level': 'src/inventory/stock-level.ts',
+    'item-stock': 'src/inventory/item-stock.ts',
+    'signed-token': 'src/security/signed-token.ts',
     'item-facts': 'src/inventory/item-facts.ts',
     'line-settlement': 'src/inventory/line-settlement.ts',
     'testing/stock-key-seam': 'src/testing/stock-key-seam.ts',

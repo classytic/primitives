@@ -13,6 +13,7 @@ import {
   isNotRequired,
   notRequiredChain,
   assertApproved,
+  attachRequest,
   skipStep,
 } from '../../src/workflow/approval.js';
 
@@ -420,5 +421,84 @@ describe('notRequiredChain — "the policy engine ran and nothing applied"', () 
     expect(persisted.notRequiredReason).toBeUndefined();
     expect(isNotRequired(persisted as ApprovalChain)).toBe(true);
     expect(isApproved(persisted as ApprovalChain)).toBe(true);
+  });
+});
+
+describe('attachRequest — maker-checker', () => {
+  const at = new Date('2026-10-01T00:00:00Z');
+
+  it('removes the requester from every step and records the request', () => {
+    const chain = createChain({
+      order: 'sequential',
+      steps: [
+        { id: 'mgr', approvers: [{ id: 'alice' }, { id: 'bob' }] },
+        { id: 'cfo', approvers: [{ id: 'carol' }] },
+      ],
+    });
+    const attached = attachRequest(chain, { by: 'alice', at, basis: { amount: 500, category: 'asset' } });
+    expect(attached.steps[0]?.approvers.map((a) => a.id)).toEqual(['bob']);
+    expect(attached.steps[1]?.approvers.map((a) => a.id)).toEqual(['carol']);
+    expect(attached.request).toEqual({ by: 'alice', at, basis: { amount: 500, category: 'asset' } });
+  });
+
+  it('throws NO_INDEPENDENT_APPROVER when the requester is the only approver', () => {
+    const chain = createChain({ order: 'sequential', steps: [{ id: 'mgr', approvers: [{ id: 'alice' }] }] });
+    try {
+      attachRequest(chain, { by: 'alice', at });
+      expect.unreachable('a chain only the requester can approve must throw');
+    } catch (e) {
+      expect((e as ApprovalError).code).toBe('NO_INDEPENDENT_APPROVER');
+    }
+  });
+
+  it('throws NO_INDEPENDENT_APPROVER when removal breaks the quorum', () => {
+    const chain = createChain({
+      order: 'parallel',
+      steps: [{ id: 'board', approvers: [{ id: 'a' }, { id: 'b' }], requiredApprovals: 2 }],
+    });
+    expect(() => attachRequest(chain, { by: 'a', at })).toThrow(/needs 2 approver/);
+  });
+
+  it('leaves a zero-step chain approved', () => {
+    const attached = attachRequest(notRequiredChain('below threshold'), { by: 'alice', at });
+    expect(isApproved(attached)).toBe(true);
+    expect(attached.request?.by).toBe('alice');
+    expect(attached.notRequiredReason).toBe('below threshold');
+  });
+
+  it('applyDecision refuses SELF_APPROVAL and allows the requester to reject (withdraw)', () => {
+    const chain = attachRequest(
+      createChain({ order: 'sequential', steps: [{ id: 'mgr', approvers: [{ id: 'alice' }, { id: 'bob' }] }] }),
+      { by: 'alice', at },
+    );
+    try {
+      applyDecision(chain, { stepId: 'mgr', approverId: 'alice', decision: 'approved' });
+      expect.unreachable('the requester must not approve their own request');
+    } catch (e) {
+      expect((e as ApprovalError).code).toBe('SELF_APPROVAL');
+    }
+    const withdrawn = applyDecision(
+      { ...chain, steps: chain.steps.map((s) => ({ ...s, approvers: [...s.approvers, { id: 'alice' }] })) },
+      { stepId: 'mgr', approverId: 'alice', decision: 'rejected' },
+    );
+    expect(isRejected(withdrawn)).toBe(true);
+  });
+
+  it('the request survives applyDecision and skipStep', () => {
+    const chain = attachRequest(
+      createChain({
+        order: 'sequential',
+        steps: [
+          { id: 'mgr', approvers: [{ id: 'bob' }] },
+          { id: 'cfo', approvers: [{ id: 'carol' }] },
+        ],
+      }),
+      { by: 'alice', at, basis: { amount: 900 } },
+    );
+    const decided = applyDecision(chain, { stepId: 'mgr', approverId: 'bob', decision: 'approved' });
+    expect(decided.request).toEqual(chain.request);
+    const skipped = skipStep(decided, 'cfo', 'below cfo threshold');
+    expect(skipped.request).toEqual(chain.request);
+    expect(isApproved(skipped)).toBe(true);
   });
 });
