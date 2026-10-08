@@ -32,7 +32,9 @@
  */
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'skipped';
-export type ChainOrder = 'sequential' | 'parallel';
+export const CHAIN_ORDERS = ['sequential', 'parallel'] as const;
+export type ChainOrder = (typeof CHAIN_ORDERS)[number];
+export const APPROVAL_THRESHOLD_OPS = ['gt', 'gte', 'lt', 'lte', 'eq'] as const;
 
 export interface Approver {
   readonly id: string;
@@ -45,6 +47,11 @@ export interface ApprovalDecision {
   readonly decision: 'approved' | 'rejected';
   readonly note?: string;
   readonly decidedAt: Date;
+  /**
+   * The org the approver acted from, when it differs from the document's (a cross-branch
+   * decision). The document's own org is the document's tenant field, so both are on the row.
+   */
+  readonly actorOrganizationId?: string;
 }
 
 /**
@@ -55,7 +62,7 @@ export interface ApprovalDecision {
  */
 export interface ApprovalThreshold {
   readonly field: string;
-  readonly op: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+  readonly op: (typeof APPROVAL_THRESHOLD_OPS)[number];
   readonly value: number;
 }
 
@@ -267,7 +274,9 @@ export function attachRequest(chain: ApprovalChain, request: ApprovalRequest): A
  * For `parallel` chains: returns the first pending step (all pending steps
  * are active simultaneously; host typically iterates with {@link pendingSteps}).
  */
-export function nextPendingStep(chain: ApprovalChain): ApprovalStep | null {
+export function nextPendingStep<S extends { readonly status: ApprovalStatus }>(chain: {
+  readonly steps: readonly S[];
+}): S | null {
   for (const step of chain.steps) {
     if (step.status === 'pending') return step;
   }
@@ -275,12 +284,74 @@ export function nextPendingStep(chain: ApprovalChain): ApprovalStep | null {
 }
 
 /** All steps currently eligible to receive a decision. */
-export function pendingSteps(chain: ApprovalChain): readonly ApprovalStep[] {
+export function pendingSteps<S extends { readonly status: ApprovalStatus }>(chain: {
+  readonly order: ChainOrder;
+  readonly steps: readonly S[];
+}): readonly S[] {
   if (chain.order === 'sequential') {
     const next = nextPendingStep(chain);
     return next ? [next] : [];
   }
   return chain.steps.filter((s) => s.status === 'pending');
+}
+
+// ─── Wire contract ───────────────────────────────────────────────────────
+
+/**
+ * The verbs every approval-bearing resource mounts at `POST /:id/action`.
+ * Servers (arc-approval) and clients (SDK, UI) both read these; never write the strings.
+ */
+export const APPROVAL_ACTIONS = { submit: 'submit_for_approval', decide: 'decide' } as const;
+export type ApprovalActionName = (typeof APPROVAL_ACTIONS)[keyof typeof APPROVAL_ACTIONS];
+
+/** Where a submit sources its chain: inline `chain`, the policy matrix, or inferred. */
+export const APPROVAL_CHAIN_SOURCES = ['auto', 'literal', 'policy'] as const;
+export type ApprovalChainSource = (typeof APPROVAL_CHAIN_SOURCES)[number];
+
+export const APPROVAL_DECISIONS = ['approved', 'rejected'] as const;
+export type ApprovalDecisionKind = (typeof APPROVAL_DECISIONS)[number];
+
+/** Longest decision note the server accepts. */
+export const APPROVAL_NOTE_MAX_LENGTH = 1000;
+
+/** `submit_for_approval` body. */
+export type ApprovalSubmitBody = {
+  readonly source?: ApprovalChainSource;
+  readonly chain?: CreateChainInput;
+};
+
+/** `decide` body. The approver is the authenticated actor — never a body field. */
+export type ApprovalDecideBody = {
+  readonly stepId: string;
+  readonly decision: ApprovalDecisionKind;
+  readonly note?: string;
+};
+
+/** The chain fields {@link decidableStepIds} reads — satisfied by a stored chain and by its JSON form. */
+export interface DecidableChain {
+  readonly order: ChainOrder;
+  readonly status: ApprovalStatus;
+  readonly steps: readonly {
+    readonly id: string;
+    readonly status: ApprovalStatus;
+    readonly approvers: readonly { readonly id: string }[];
+    readonly decisions: readonly { readonly approverId: string }[];
+  }[];
+}
+
+/**
+ * The steps `actorId` may decide now: active, naming the actor as an approver, not yet
+ * decided by them. The ONE answer to "may this actor decide" for server and UI alike.
+ */
+export function decidableStepIds(chain: DecidableChain, actorId: string | null | undefined): string[] {
+  if (!actorId || chain.status !== 'pending') return [];
+  return pendingSteps(chain)
+    .filter(
+      (s) =>
+        s.approvers.some((a) => a.id === actorId) &&
+        !s.decisions.some((d) => d.approverId === actorId),
+    )
+    .map((s) => s.id);
 }
 
 export interface DecisionInput {
@@ -289,6 +360,7 @@ export interface DecisionInput {
   readonly decision: 'approved' | 'rejected';
   readonly note?: string;
   readonly decidedAt?: Date;
+  readonly actorOrganizationId?: string;
 }
 
 /**
@@ -341,6 +413,7 @@ export function applyDecision(chain: ApprovalChain, input: DecisionInput): Appro
     decision: input.decision,
     ...(input.note !== undefined ? { note: input.note } : {}),
     decidedAt: input.decidedAt ?? new Date(),
+    ...(input.actorOrganizationId !== undefined ? { actorOrganizationId: input.actorOrganizationId } : {}),
   };
 
   const updatedStep = computeStepStatus({

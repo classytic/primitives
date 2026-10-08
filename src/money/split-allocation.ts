@@ -76,7 +76,8 @@ export type SplitAllocationErrorCode =
   | 'INVALID_WEIGHT'
   | 'INVALID_PERCENT'
   | 'ZERO_WEIGHT_SUM'
-  | 'DUPLICATE_SUBJECT_ID';
+  | 'DUPLICATE_SUBJECT_ID'
+  | 'DISCOUNT_EXCEEDS_BASE';
 
 export class SplitAllocationError extends Error {
   override readonly name = 'SplitAllocationError';
@@ -227,6 +228,10 @@ function distribute(total: number, weights: readonly number[]): number[] {
     return weights.map(() => 0);
   }
 
+  if (weights.every(Number.isSafeInteger) && Number.isSafeInteger(weightSum)) {
+    return distributeExact(total, weights, weightSum);
+  }
+
   const raw = weights.map((w) => (total * w) / weightSum);
   const floored = raw.map((r) => Math.floor(r));
   const residue = total - floored.reduce((a, b) => a + b, 0);
@@ -252,8 +257,75 @@ function distribute(total: number, weights: readonly number[]): number[] {
   return result;
 }
 
+/**
+ * Largest remainder in exact integer arithmetic, for integer weights (minor-unit amounts). Shares
+ * and remainders are compared as BigInt quotients of one denominator, so neither the floor nor the
+ * remainder ranking can drift once `total × weight` passes 2^53.
+ */
+function distributeExact(total: number, weights: readonly number[], weightSum: number): number[] {
+  const t = BigInt(total);
+  const d = BigInt(weightSum);
+  const shares = weights.map((w) => {
+    const n = t * BigInt(w);
+    return { floor: n / d, rem: n % d };
+  });
+  const result = shares.map((s) => Number(s.floor));
+  const residue = total - result.reduce((a, b) => a + b, 0);
+  const order = shares
+    .map((s, i) => ({ i, rem: s.rem }))
+    .sort((a, b) => (a.rem === b.rem ? a.i - b.i : a.rem > b.rem ? -1 : 1));
+  for (let k = 0; k < residue; k++) {
+    const entry = order[k];
+    if (entry === undefined) throw new Error('split-allocation invariant: residue exceeds the subject count');
+    result[entry.i] = (result[entry.i] ?? 0) + 1;
+  }
+  return result;
+}
+
 /** True if `sum(parts[i].amount) === result.total`. Useful as an assertion in host code. */
 export function isBalanced(result: SplitResult): boolean {
   const sum = result.parts.reduce((acc, p) => acc + p.amount, 0);
   return sum === result.total;
+}
+
+/** A line a document-level discount may be spread over. */
+export interface DiscountSubject {
+  readonly id: string;
+  /** The line's value before the discount, integer minor units (non-negative). */
+  readonly weight: number;
+  /** `false` for a line the discount was never computed on (a delivery charge, an auto-added fee). Absent ⇒ eligible. */
+  readonly discountable?: boolean;
+}
+
+/**
+ * THE discount allocation: spread a document-level discount over its eligible lines, by value,
+ * exact largest remainder. Every document that splits one discount — the order, its invoice,
+ * its credit notes, a return's value — calls this, so they agree to the minor unit.
+ *
+ * Returns a FULL map in input order: every subject id, `0` for an ineligible or zero-weight one.
+ * `0` discount allocates zeros; a discount equal to the eligible base allocates all of it; a
+ * discount above it throws `DISCOUNT_EXCEEDS_BASE` — the figures disagree.
+ */
+export function allocateDiscount(discount: number, subjects: readonly DiscountSubject[]): ReadonlyMap<string, number> {
+  if (!Number.isInteger(discount) || discount < 0) {
+    throw new SplitAllocationError('INVALID_TOTAL', `discount must be a non-negative integer, got ${discount}`);
+  }
+  const out = new Map<string, number>();
+  for (const s of subjects) {
+    if (out.has(s.id)) throw new SplitAllocationError('DUPLICATE_SUBJECT_ID', `duplicate subject id: ${s.id}`);
+    if (!Number.isFinite(s.weight) || s.weight < 0) {
+      throw new SplitAllocationError('INVALID_WEIGHT', `subject ${s.id}: weight must be a non-negative number`);
+    }
+    out.set(s.id, 0);
+  }
+  const eligible = subjects.filter((s) => s.discountable !== false && s.weight > 0);
+  const base = eligible.reduce((sum, s) => sum + s.weight, 0);
+  if (discount > base) {
+    throw new SplitAllocationError('DISCOUNT_EXCEEDS_BASE', `discount ${discount} exceeds the discountable base ${base}`);
+  }
+  if (discount === 0) return out;
+  for (const part of allocate(discount, eligible.map((s) => ({ id: s.id, weight: s.weight })), 'by-value').parts) {
+    out.set(part.id, part.amount);
+  }
+  return out;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   allocate,
+  allocateDiscount,
   isBalanced,
   SplitAllocationError,
   type SplitMethod,
@@ -346,5 +347,47 @@ describe('isBalanced', () => {
       parts: [{ id: first.id, amount: first.amount + 1, weight: first.weight }, second],
     };
     expect(isBalanced(tampered)).toBe(false);
+  });
+});
+
+describe('allocate — exact integer arithmetic past 2^53', () => {
+  it('floors and ranks remainders exactly when total × weight exceeds the float mantissa', () => {
+    // Float division gives [1089366785677, 984944749998, 94716]; the exact shares are below.
+    const total = 2_074_311_630_391;
+    const weights = [6_440_742_235, 5_823_360_262, 560];
+    const result = allocate(total, weights.map((weight, i) => ({ id: `L${i}`, weight })), 'by-value');
+    expect(result.parts.map((p) => p.amount)).toEqual([1_089_366_785_676, 984_944_749_998, 94_717]);
+    expect(sumOfParts(result)).toBe(total);
+    const sum = weights.reduce((a, b) => a + b, 0);
+    for (const [i, part] of result.parts.entries()) {
+      const exact = (BigInt(total) * BigInt(weights[i] ?? 0)) / BigInt(sum);
+      expect(BigInt(part.amount) - exact >= 0n && BigInt(part.amount) - exact <= 1n).toBe(true);
+    }
+  });
+});
+
+describe('allocateDiscount — the one document-discount split', () => {
+  it('spreads a promo over the goods only, exactly, and returns every id', () => {
+    const shares = allocateDiscount(20_001, [
+      { id: 'line_0', weight: 100_011 },
+      { id: 'bag_fee', weight: 5_000, discountable: false },
+      { id: 'line_2', weight: 95_554 },
+    ]);
+    expect([...shares.keys()]).toEqual(['line_0', 'bag_fee', 'line_2']);
+    expect(shares.get('bag_fee')).toBe(0);
+    expect((shares.get('line_0') ?? 0) + (shares.get('line_2') ?? 0)).toBe(20_001);
+  });
+
+  it('three equal lines, discount 2: largest remainder, never 0,0,2', () => {
+    const shares = [...allocateDiscount(2, [{ id: 'a', weight: 1 }, { id: 'b', weight: 1 }, { id: 'c', weight: 1 }]).values()];
+    expect(shares).toEqual([1, 1, 0]);
+  });
+
+  it('a discount equal to the base allocates all of it; above the base throws', () => {
+    const all = allocateDiscount(50_000, [{ id: 'a', weight: 30_000 }, { id: 'b', weight: 20_000 }]);
+    expect([...all.values()]).toEqual([30_000, 20_000]);
+    expect(() =>
+      allocateDiscount(12_000, [{ id: 'a', weight: 10_000 }, { id: 'fee', weight: 5_000, discountable: false }]),
+    ).toThrow(SplitAllocationError);
   });
 });
