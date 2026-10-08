@@ -3,7 +3,7 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.29.0 — Unreleased
+## 0.29.0 — 2026-10-08
 
 ### Added — `./signed-token`: ES256 compact JWS over WebCrypto
 `signToken` / `verifyToken` for a server and an offline device, no dependency. `typ` is required on both
