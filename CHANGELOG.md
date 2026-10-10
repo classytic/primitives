@@ -3,6 +3,20 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.30.0 — unreleased
+
+### Added — `./durable-events`: the declaration and the ONE kernel dispatch
+- `EventDurability`, `DurableEventSpec`, `FactExpectation`; `eventIdFor` / `durableEventMeta` (`${name}:v${version}:${occurrence}`); `requireDurableContext` + `NonDurablePublishError`; `UnmanagedSessionError`.
+- `dispatchDomainEvent(channels, unit, event, durability)` saves the outbox row in the session, defers to commit, and acknowledges after an inline publish.
+- `flushDeferredEvents` delivers a committed queue and acknowledges every delivered row in ONE `acknowledgeMany`.
+Pinned by `tests/unit/durable-events.test.ts`.
+
+### Added — `./outbox`: `OutboxConflictError`, `outboxPayloadFingerprint`, optional `OutboxStore.acknowledgeMany`
+
+### ⚠ Changed
+- `createChildEvent` no longer inherits the parent's `idempotencyKey`. A child is its own occurrence; an inherited key made a store drop the second of two child types.
+- `MemoryOutboxStore.save`: the same id with the same payload is a no-op, and a different payload throws `OutboxConflictError`.
+
 ## 0.29.0 — 2026-10-08
 
 ### Added — `./signed-token`: ES256 compact JWS over WebCrypto

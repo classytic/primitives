@@ -188,6 +188,7 @@ export async function dispatchDomainEvent(
 /**
  * Deliver a committed unit of work's queue. Under `'relay'` the rows are the delivery and nothing
  * is published. Returns each published event's outcome (`null` = delivered and acknowledged).
+ * Delivered rows are acknowledged with one `acknowledgeMany` when the store has it.
  */
 export async function flushDeferredEvents(
   channels: DispatchChannels,
@@ -206,7 +207,21 @@ export async function flushDeferredEvents(
       continue;
     }
     outcomes.set(event.meta.id, null);
-    await acknowledgeDelivered(channels, event, log);
+  }
+  const delivered = events.filter((e) => outcomes.get(e.meta.id) === null);
+  const outbox = channels.outbox;
+  if (outbox?.acknowledgeMany && delivered.length > 0) {
+    // ONE write per flush: a per-event acknowledge makes a unit of work N+1.
+    try {
+      await outbox.acknowledgeMany(delivered.map((e) => e.meta.id));
+    } catch (err) {
+      log.error(
+        `[${channels.label}] outbox acknowledgeMany failed for ${delivered.length} events:`,
+        err,
+      );
+    }
+  } else {
+    for (const event of delivered) await acknowledgeDelivered(channels, event, log);
   }
   return outcomes;
 }

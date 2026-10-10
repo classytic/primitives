@@ -177,6 +177,17 @@ export class MemoryOutboxStore implements OutboxStore {
     entry.leaseOwner = null;
   }
 
+  async acknowledgeMany(eventIds: readonly string[]): Promise<void> {
+    const ids = new Set(eventIds);
+    const now = Date.now();
+    for (const entry of this.entries) {
+      if (!ids.has(entry.event.meta.id) || entry.status === 'delivered') continue;
+      entry.status = 'delivered';
+      entry.deliveredAt = now;
+      entry.leaseOwner = null;
+    }
+  }
+
   async fail(eventId: string, error: OutboxErrorInfo, options?: OutboxFailOptions): Promise<void> {
     const entry = this.entries.find((e) => e.event.meta.id === eventId);
     if (!entry) return;

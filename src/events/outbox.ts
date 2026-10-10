@@ -378,6 +378,13 @@ export interface OutboxStore {
   acknowledge(eventId: string, options?: OutboxAcknowledgeOptions): Promise<void>;
 
   /**
+   * Mark every listed event delivered in ONE write — what a unit of work's post-commit flush
+   * calls, so N delivered events cost one command, not N. Unleased rows only (no fencing);
+   * unknown or already-delivered ids are ignored.
+   */
+  acknowledgeMany?(eventIds: readonly string[]): Promise<void>;
+
+  /**
    * Record a relay failure. When implemented, the relay calls this instead
    * of stopping the batch — enables retry scheduling and DLQ.
    *

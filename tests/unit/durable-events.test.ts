@@ -247,6 +247,43 @@ describe('dispatchDomainEvent', () => {
   });
 });
 
+describe('flushDeferredEvents — the acknowledge is ONE write per flush', () => {
+  class CountingStore extends MemoryOutboxStore {
+    writes = 0;
+    override async acknowledge(eventId: string): Promise<void> {
+      this.writes++;
+      await super.acknowledge(eventId);
+    }
+    override async acknowledgeMany(eventIds: readonly string[]): Promise<void> {
+      this.writes++;
+      await super.acknowledgeMany(eventIds);
+    }
+  }
+
+  async function writesFor(n: number): Promise<{ writes: number; delivered: number }> {
+    const outbox = new CountingStore();
+    const channels = { outbox, transport: new InProcessEventBus({ logger: null }), label: 'test' };
+    const queue: DomainEvent[] = [];
+    for (let i = 0; i < n; i++) {
+      await dispatchDomainEvent(
+        channels,
+        { session: SESSION, pending: queue },
+        createEvent('order:noted', { i }),
+        'ephemeral',
+      );
+    }
+    await flushDeferredEvents(channels, queue);
+    return { writes: outbox.writes, delivered: await outbox.countByStatus('delivered') };
+  }
+
+  it('acknowledges 1 or 25 delivered events with the same number of writes', async () => {
+    const one = await writesFor(1);
+    const many = await writesFor(25);
+    expect(one).toEqual({ writes: 1, delivered: 1 });
+    expect(many).toEqual({ writes: 1, delivered: 25 });
+  });
+});
+
 describe('outbox identity', () => {
   it('a second save under the same id with a DIFFERENT payload throws instead of vanishing', async () => {
     const outbox = new MemoryOutboxStore();
