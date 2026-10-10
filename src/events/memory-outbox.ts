@@ -13,12 +13,14 @@ import {
   type OutboxAcknowledgeOptions,
   type OutboxClaimedEvent,
   type OutboxClaimOptions,
+  OutboxConflictError,
   type OutboxErrorInfo,
   type OutboxFailOptions,
   OutboxOwnershipError,
   type OutboxStatus,
   type OutboxStore,
   type OutboxWriteOptions,
+  outboxPayloadFingerprint,
 } from './outbox.js';
 
 const DEFAULT_LEASE_MS = 30_000;
@@ -80,6 +82,11 @@ export class MemoryOutboxStore implements OutboxStore {
     }
     if (!event.meta?.id || typeof event.meta.id !== 'string') {
       throw new InvalidOutboxEventError('event.meta.id is required');
+    }
+    const existing = this.entries.find((e) => e.event.meta.id === event.meta.id);
+    if (existing) {
+      if (outboxPayloadFingerprint(existing.event) === outboxPayloadFingerprint(event)) return;
+      throw new OutboxConflictError(event.meta.id, event.type);
     }
     if (options?.dedupeKey) {
       if (this.seenDedupeKeys.has(options.dedupeKey)) return;

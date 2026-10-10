@@ -97,7 +97,7 @@ export interface EventMeta {
    * `meta.id` (which is fresh per emit — a retry would produce a new id).
    *
    * Typical sources: HTTP `Idempotency-Key` header, outbox `dedupeKey`, or
-   * `{aggregate.type}:{aggregate.id}:{action}`. Inherited by child events.
+   * `{aggregate.type}:{aggregate.id}:{action}`. NOT inherited by child events.
    */
   idempotencyKey?: string;
 
@@ -251,11 +251,11 @@ export function createEvent<T>(
  *  - `causationId` is set to the parent's `id` (direct cause)
  *  - `correlationId` is inherited from the parent if set, else falls back
  *    to the parent's `id` (root correlation)
- *  - `userId` / `organizationId` / `source` / `idempotencyKey` are inherited
- *    when set on the parent so the whole chain stays scoped to the
- *    originating principal, tenant, emitter, and logical operation
- *  - `aggregate` is NOT inherited — child events typically belong to a
- *    different aggregate than their parent
+ *  - `userId` / `organizationId` / `source` are inherited when set on the
+ *    parent so the chain stays scoped to the originating principal, tenant
+ *    and emitter
+ *  - `idempotencyKey` and `aggregate` are NOT inherited — a child is its own
+ *    occurrence (see `@classytic/primitives/durable-events` `eventIdFor`)
  *
  * Caller-supplied `meta` wins over inherited fields — pass `{ userId: newActor }`
  * to override when a subsystem acts on behalf of a different principal.
@@ -287,11 +287,8 @@ export function createChildEvent<T>(
     inherited.organizationId = parent.meta.organizationId;
   }
   if (parent.meta.source !== undefined) inherited.source = parent.meta.source;
-  if (parent.meta.idempotencyKey !== undefined) {
-    inherited.idempotencyKey = parent.meta.idempotencyKey;
-  }
-  // `aggregate` is NOT inherited — child events usually belong to a different
-  // aggregate than their parent (see the DDD semantics in EventMeta docs).
+  // `idempotencyKey` and `aggregate` are NOT inherited: a child is its own occurrence,
+  // and an inherited key makes a store drop the second of two child types as a duplicate.
 
   return {
     type,

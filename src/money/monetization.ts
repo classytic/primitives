@@ -442,6 +442,18 @@ export function compareAtPriceOf(m: Monetization): Money | null {
   return null;
 }
 
+/** On sale: a compare-at price above the selling price, same currency. The ONE on-sale predicate. */
+export function isOnSale(m: Monetization): boolean {
+  const compareAt = compareAtPriceOf(m);
+  const price = unitPriceOf(m);
+  return (
+    compareAt !== null &&
+    price !== null &&
+    compareAt.currency === price.currency &&
+    compareAt.amount > price.amount
+  );
+}
+
 /* ───────────────── reconciliation with revenue's wire enum ───────────────── */
 
 /**

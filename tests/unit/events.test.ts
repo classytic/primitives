@@ -104,7 +104,7 @@ describe('createChildEvent — causation chain', () => {
     expect(child.meta.organizationId).toBeUndefined();
   });
 
-  it('inherits source + idempotencyKey from parent', () => {
+  it('inherits source but NOT idempotencyKey from parent', () => {
     const parent = createEvent(
       'order:placed',
       {},
@@ -116,7 +116,7 @@ describe('createChildEvent — causation chain', () => {
     );
     const child = createChildEvent(parent, 'inventory:reserved', {});
     expect(child.meta.source).toBe('commerce');
-    expect(child.meta.idempotencyKey).toBe('order:ord_1:place');
+    expect(child.meta.idempotencyKey).toBeUndefined();
   });
 
   it('does NOT inherit aggregate (child usually belongs to a different aggregate)', () => {

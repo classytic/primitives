@@ -12,6 +12,7 @@ import {
   defaultPassOf,
   fromRevenueMonetizationType,
   isBundleMonetization,
+  isOnSale,
   isFreeMonetization,
   isMonetizationKind,
   isOneTimeMonetization,
@@ -221,5 +222,25 @@ describe('revenue reconciliation', () => {
     for (const t of wire) {
       expect(toRevenueMonetizationType(fromRevenueMonetizationType(t))).toBe(t);
     }
+  });
+});
+
+describe('isOnSale', () => {
+  const m = (base: number, compareAt?: number, compareCurrency = 'BDT'): Monetization => ({
+    type: 'one_time',
+    pricing: {
+      basePrice: { amount: base, currency: 'BDT' },
+      currency: 'BDT',
+      ...(compareAt === undefined ? {} : { compareAtPrice: { amount: compareAt, currency: compareCurrency } }),
+    },
+  });
+
+  it('is on sale only when compare-at is above the selling price in the same currency', () => {
+    expect(isOnSale(m(12000, 15000))).toBe(true);
+    expect(isOnSale(m(12000, 12000))).toBe(false);
+    expect(isOnSale(m(12000, 9000))).toBe(false);
+    expect(isOnSale(m(12000))).toBe(false);
+    expect(isOnSale(m(12000, 15000, 'USD'))).toBe(false);
+    expect(isOnSale({ type: 'free' })).toBe(false);
   });
 });

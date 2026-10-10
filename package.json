@@ -96,6 +96,11 @@
       "types": "./dist/memory-outbox.d.mts",
       "default": "./dist/memory-outbox.mjs"
     },
+    "./durable-events": {
+      "@classytic/source": "./src/events/durable.ts",
+      "types": "./dist/durable-events.d.mts",
+      "default": "./dist/durable-events.mjs"
+    },
     "./event-infra": {
       "@classytic/source": "./src/events/event-infra.ts",
       "types": "./dist/event-infra.d.mts",

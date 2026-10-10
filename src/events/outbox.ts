@@ -16,6 +16,7 @@
  * `@classytic/primitives/event-infra`.
  */
 
+import { canonicalDigest } from '../serialization/canonical.js';
 import type { DeadLetteredEvent, DomainEvent } from './events.js';
 
 // ============================================================================
@@ -204,6 +205,36 @@ export class OutboxOwnershipError extends Error {
   }
 }
 
+/**
+ * Thrown by `save` when a row with this event id already exists with a DIFFERENT payload.
+ * A same-id, same-payload save is an idempotent success; a different payload is two
+ * occurrences minted onto one id, and dropping either one loses money silently.
+ */
+export class OutboxConflictError extends Error {
+  override readonly name = 'OutboxConflictError';
+  readonly code = 'outbox.conflict';
+  readonly eventId: string;
+  readonly eventType: string;
+
+  constructor(eventId: string, eventType: string) {
+    super(
+      `Outbox already holds event "${eventId}" (${eventType}) with a different payload — ` +
+        'two occurrences share one id. Derive the occurrence from the aggregate id plus the step.',
+    );
+    this.eventId = eventId;
+    this.eventType = eventType;
+  }
+}
+
+/**
+ * Order-independent fingerprint of an event payload as it travels (JSON: `Date` becomes its
+ * ISO string, `undefined` drops). Stores compare it on a duplicate id; see {@link OutboxConflictError}.
+ */
+export function outboxPayloadFingerprint(event: DomainEvent): string {
+  const wire: unknown = JSON.parse(JSON.stringify(event.payload ?? null));
+  return canonicalDigest(wire);
+}
+
 /** Thrown when an event missing `type` or `meta.id` is passed to the outbox. */
 export class InvalidOutboxEventError extends Error {
   override readonly name = 'InvalidOutboxEventError';
@@ -308,7 +339,8 @@ export interface OutboxStore {
   /**
    * Save an event to the outbox (typically called inside a business
    * transaction). MUST reject events missing `type` or `meta.id` — throw
-   * rather than persist.
+   * rather than persist. A second save of an existing `meta.id` is a no-op when
+   * the payload matches, and throws {@link OutboxConflictError} when it does not.
    */
   save(event: DomainEvent, options?: OutboxWriteOptions): Promise<void>;
 

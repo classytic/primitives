@@ -99,8 +99,11 @@ export interface ApprovalChain {
 export interface ApprovalRequest {
   readonly by: string;
   readonly at: Date;
-  /** What the approval covers. A later amount above `basis.amount` is not covered. */
-  readonly basis?: { readonly amount?: number; readonly category?: string };
+  /**
+   * What the approval covers. A later amount above `basis.amount` is not covered. `unit` states the
+   * amount is integer base-currency minor units; a stored amount without it is of unknown unit.
+   */
+  readonly basis?: { readonly amount?: number; readonly unit?: 'minor'; readonly category?: string };
 }
 
 export interface CreateChainInput {

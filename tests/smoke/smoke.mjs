@@ -69,6 +69,11 @@ const checks = [
   // 0.20.0: the store moved to its own subpath. `/event-infra` is the BUS —
   // it no longer re-exports `MemoryOutboxStore`, and there is no compat path.
   ['./memory-outbox', 'MemoryOutboxStore'],
+  ['./durable-events', 'dispatchDomainEvent'],
+  ['./durable-events', 'flushDeferredEvents'],
+  ['./durable-events', 'eventIdFor'],
+  ['./durable-events', 'requireDurableContext'],
+  ['./outbox', 'OutboxConflictError'],
   // ─── 0.21.0 additions ────────────────────────────────────────────────
   // Period resolution moved DOWN into primitives (was @spinekit/kit/period
   // + be-prod business-date, both above the kernels).
