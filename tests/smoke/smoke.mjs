@@ -101,6 +101,12 @@ const checks = [
   // them back to a raw `NODE_ENV === 'production'` comparison.
   ['./environment', 'classifyEnv'],
   ['./environment', 'isProductionEnv'],
+  // ─── 0.31.0 additions ────────────────────────────────────────────────
+  ['./quantity', 'snapQuantity'],
+  ['./quantity', 'isOnQuantityGrid'],
+  ['./quantity', 'QUANTITY_SCALE'],
+  ['./usage-pricing', 'priceUsage'],
+  ['./usage-pricing', 'UsagePricingError'],
 ];
 
 const failures = [];

@@ -10,7 +10,7 @@ export type MeasureDimension = 'mass' | 'duration' | 'volume' | 'length' | 'area
 export interface MeasuredPriceBasis {
   readonly kind: 'measured';
   readonly dimension: MeasureDimension;
-  /** Integer unit carried by the line quantity, such as `gram` or `minute`. */
+  /** Unit carried by the line quantity, such as `gram` or `minute`; the quantity may be fractional. */
   readonly quantityUnit: string;
   /** Unit named by the quoted price, such as `kilogram` or `hour`. */
   readonly priceUnit: string;
@@ -89,7 +89,10 @@ export function isPriceBasis(value: unknown): value is PriceBasis {
   );
 }
 
-/** Extend a minor-unit price using integer quantity and exact half-even rounding. */
+/**
+ * Extend a minor-unit price across a non-negative quantity, exactly, on the 6-dp quantity grid,
+ * rounding once (half-even). A quantity off the grid throws.
+ */
 export function resolvePriceBasisTotal(
   unitPriceMinor: number,
   quantity: number,
@@ -101,12 +104,18 @@ export function resolvePriceBasisTotal(
       'unitPriceMinor must be a non-negative safe integer',
     );
   }
-  if (!Number.isSafeInteger(quantity) || quantity < 0) {
-    throw new PriceBasisError('INVALID_QUANTITY', 'quantity must be a non-negative safe integer');
+  if (!(quantity >= 0) || !(Number.isSafeInteger(quantity) || isOnQuantityGrid(quantity))) {
+    throw new PriceBasisError(
+      'INVALID_QUANTITY',
+      `quantity ${quantity} must be a non-negative integer, or a fraction on the 1/${QUANTITY_SCALE} grid`,
+    );
   }
 
-  const numerator = BigInt(unitPriceMinor) * BigInt(quantity);
-  const denominator = basis.kind === 'measured' ? BigInt(basis.quantityPerPriceUnit) : 1n;
+  // A whole quantity keeps the exact integer path (its full safe range); only a fraction goes through the grid.
+  const whole = Number.isSafeInteger(quantity);
+  const perPriceUnit = basis.kind === 'measured' ? BigInt(basis.quantityPerPriceUnit) : 1n;
+  const numerator = BigInt(unitPriceMinor) * (whole ? BigInt(quantity) : quantityToGrid(quantity));
+  const denominator = whole ? perPriceUnit : perPriceUnit * BigInt(QUANTITY_SCALE);
   const rounded = roundedDiv(numerator, denominator, 'half-even');
   const total = Number(rounded);
   if (!Number.isSafeInteger(total)) {
@@ -115,4 +124,5 @@ export function resolvePriceBasisTotal(
   return total;
 }
 
+import { isOnQuantityGrid, QUANTITY_SCALE, quantityToGrid } from '../inventory/quantity.js';
 import { roundedDiv } from './rounded-div.js';

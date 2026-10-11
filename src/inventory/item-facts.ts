@@ -25,6 +25,8 @@ export interface ItemStockSource {
   displayName: string;
   /** The canonical STOCK unit — what quants and moves are balanced in. */
   uom: string;
+  /** The stock unit's UoM group (`_id` or `code`); its base unit is `uom` and its rounding is the posting step. */
+  uomGroupRef?: string | undefined;
   trackingMode: TrackingMode;
   trackingPolicy?: ShelfLifePolicy | undefined;
   /**
@@ -46,6 +48,10 @@ export interface ProductFacet {
   sku: string;
   displayName: string;
   uom?: string | undefined;
+  /** Fallback group for a product-only deployment; never read when an Item exists. */
+  uomGroupRef?: string | undefined;
+  /** The product declares a unit of measure, even if its group was lost on the way here. */
+  unitOfMeasureDeclared?: boolean | undefined;
   trackingMode?: TrackingMode | undefined;
   trackingPolicy?: ShelfLifePolicy | undefined;
   catchWeight?: boolean | undefined;
@@ -64,6 +70,14 @@ export interface ItemStockFacts {
   trackingMode: TrackingMode;
   trackingPolicy?: ShelfLifePolicy;
   uom: string;
+  /** UoM group whose rounding a posting snaps to. Absent ⇒ the bare quantity grid. */
+  uomGroupRef?: string;
+  /**
+   * A source declared a unit of measure, so a missing `uomGroupRef` must be
+   * REFUSED by the stock engine, never read as "no rounding". Not set by `uom`
+   * alone: every Item has a `uom`.
+   */
+  unitOfMeasureDeclared?: boolean;
   catchWeight?: boolean;
   weightUom?: string;
   weight?: number;
@@ -78,6 +92,9 @@ const FALLBACK_UOM = "unit";
 const defined = <T>(key: string, value: T | undefined): Record<string, T> =>
   value === undefined ? {} : ({ [key]: value } as Record<string, T>);
 
+const declaresGroup = (p: ProductFacet | null | undefined): boolean =>
+  !!p && (p.uomGroupRef !== undefined || p.unitOfMeasureDeclared === true);
+
 /**
  * Merge an Item with its Product facet.
  *
@@ -89,6 +106,11 @@ const defined = <T>(key: string, value: T | undefined): Record<string, T> =>
  * `isActive` follows the ITEM when one exists: a product withdrawn from sale is
  * still stock on a shelf, whereas a retired item is not stockable at all. Taking
  * the product's flag would make unlisting a product silently orphan its stock.
+ *
+ * `uomGroupRef` follows the ITEM when one exists. A product group under an Item
+ * that declares none is never borrowed (its step is in a unit the Item may not
+ * count in): the facts carry `unitOfMeasureDeclared: true` and no group, so the
+ * stock engine refuses the posting until the Item declares its own.
  */
 export function resolveStockFacts(input: {
   item?: ItemStockSource | null | undefined;
@@ -104,6 +126,8 @@ export function resolveStockFacts(input: {
       sku: p.sku,
       displayName: p.displayName,
       uom: p.uom ?? FALLBACK_UOM,
+      ...defined("uomGroupRef", p.uomGroupRef),
+      ...(p.unitOfMeasureDeclared === true ? { unitOfMeasureDeclared: true } : {}),
       trackingMode: p.trackingMode ?? "none",
       ...defined("trackingPolicy", p.trackingPolicy),
       ...defined("catchWeight", p.catchWeight),
@@ -120,6 +144,8 @@ export function resolveStockFacts(input: {
     sku: product?.sku ?? item.sku,
     displayName: product?.displayName ?? item.displayName,
     uom: item.uom,
+    ...defined("uomGroupRef", item.uomGroupRef),
+    ...(item.uomGroupRef === undefined && declaresGroup(product) ? { unitOfMeasureDeclared: true } : {}),
     trackingMode: item.trackingMode,
     ...defined("trackingPolicy", item.trackingPolicy),
     ...defined("catchWeight", item.catchWeight),

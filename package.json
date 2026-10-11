@@ -1,6 +1,6 @@
 {
   "name": "@classytic/primitives",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "description": "Framework-agnostic TypeScript primitives shared across Classytic packages — Money, events, pagination, tenant config, and other building blocks.",
   "author": "Classytic",
   "license": "MIT",
@@ -296,6 +296,16 @@
       "@classytic/source": "./src/security/signed-token.ts",
       "types": "./dist/signed-token.d.mts",
       "default": "./dist/signed-token.mjs"
+    },
+    "./quantity": {
+      "@classytic/source": "./src/inventory/quantity.ts",
+      "types": "./dist/quantity.d.mts",
+      "default": "./dist/quantity.mjs"
+    },
+    "./usage-pricing": {
+      "@classytic/source": "./src/money/usage-pricing.ts",
+      "types": "./dist/usage-pricing.d.mts",
+      "default": "./dist/usage-pricing.mjs"
     },
     "./item-stock": {
       "@classytic/source": "./src/inventory/item-stock.ts",

@@ -29,6 +29,7 @@ export default defineConfig({
     'payment-allocation-status': 'src/money/payment-allocation-status.ts',
     monetization: 'src/money/monetization.ts',
     proration: 'src/money/proration.ts',
+    'usage-pricing': 'src/money/usage-pricing.ts',
 
     // ─── identity ───────────────────────────────────────────────────────
     person: 'src/identity/person.ts',
@@ -42,6 +43,7 @@ export default defineConfig({
     'item-identity': 'src/identity/item-identity.ts',
     'stock-level': 'src/inventory/stock-level.ts',
     'item-stock': 'src/inventory/item-stock.ts',
+    quantity: 'src/inventory/quantity.ts',
     'signed-token': 'src/security/signed-token.ts',
     'item-facts': 'src/inventory/item-facts.ts',
     'line-settlement': 'src/inventory/line-settlement.ts',

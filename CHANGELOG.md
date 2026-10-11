@@ -3,7 +3,36 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.30.0 — 2026-10-11
+## 0.31.0 — 2026-10-11
+
+### Added — `./quantity`: the 6-decimal quantity grid for fractional stock and sale quantities
+- `snapQuantity(qty, step?, mode)` (half-even by default), `isOnStep`, `compareQuantity`, `quantitiesEqual`,
+  `quantityToGrid`, `quantityStepToGrid`, `QUANTITY_SCALE` (1,000,000) and `QuantityError`
+  (`NOT_FINITE` / `INVALID_STEP` / `UNSAFE_QUANTITY`).
+- `isOnQuantityGrid(value)`: STRICT, for input boundaries. `isOnStep` snaps first, so
+  `isOnStep(2.3500004, 0.001)` is true; `isOnQuantityGrid(2.3500004)` is false.
+
+### Added — `./usage-pricing`
+- `priceUsage(rating, measured)` prices a measured amount against a `UsageRating` (per-unit, tiered, volume,
+  package; a started unit counts whole; breakdown included), plus `UsageMeasure` / `isUsageMeasure` and
+  `UsagePricingError`.
+
+### Added — the stock unit group on item facts
+- `uomGroupRef` (optional) on `ItemStockSource`, `ProductFacet` and `ItemStockFacts`, and `unitOfMeasureDeclared`
+  (optional) on `ProductFacet` and `ItemStockFacts`. `resolveStockFacts` takes the Item's group, falls back to
+  the product's only when no Item exists, and marks an ungrouped Item under a grouped product
+  `unitOfMeasureDeclared` instead of borrowing the product's group. All fields optional: existing values of these
+  types still type-check.
+
+### Changed — `resolvePriceBasisTotal` accepts a fractional quantity
+- A whole quantity is computed exactly as before, across the full safe-integer range (pinned by a regression
+  test against the previous formula).
+- A fractional quantity on the 6-decimal grid (e.g. `2.35`) is priced exactly: price × quantity on the grid,
+  divided by the measured basis, rounded ONCE half-even. Previously it threw `INVALID_QUANTITY`.
+- Still refused (`INVALID_QUANTITY`): a negative, non-finite or off-grid quantity (a 7th decimal), or a
+  fraction too large to scale exactly.
+
+## 0.30.0 — never published separately; shipped in 0.31.0
 
 ### Added — `./durable-events`: the declaration and the ONE kernel dispatch
 - `EventDurability`, `DurableEventSpec`, `FactExpectation`; `eventIdFor` / `durableEventMeta` (`${name}:v${version}:${occurrence}`); `requireDurableContext` + `NonDurablePublishError`; `UnmanagedSessionError`.
