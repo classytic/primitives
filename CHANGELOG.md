@@ -3,7 +3,7 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.30.0 — unreleased
+## 0.30.0 — 2026-10-11
 
 ### Added — `./durable-events`: the declaration and the ONE kernel dispatch
 - `EventDurability`, `DurableEventSpec`, `FactExpectation`; `eventIdFor` / `durableEventMeta` (`${name}:v${version}:${occurrence}`); `requireDurableContext` + `NonDurablePublishError`; `UnmanagedSessionError`.
