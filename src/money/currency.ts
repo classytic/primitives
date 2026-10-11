@@ -3,6 +3,7 @@ import type { Brand } from '../composition/brand.js';
 // value import back would be a genuine ESM cycle. Everything this file needs
 // from Money is erased at build time.
 import type { Money } from './money.js';
+import { roundedDiv } from './rounded-div.js';
 
 /**
  * ISO 4217 currency code (3 uppercase letters).
@@ -252,6 +253,33 @@ function roundMinor(raw: number, mode: FxRounding): number {
   return Math.round(Math.abs(raw)) * sign;
 }
 
+/** `numerator / denominator` (denominator > 0) landed exactly by `mode`. */
+function divideMinor(numerator: bigint, denominator: bigint, mode: FxRounding): bigint {
+  if (mode === 'half-away-from-zero') return roundedDiv(numerator, denominator, 'half-up');
+  const quotient = numerator / denominator; // truncates toward zero
+  if (numerator % denominator === 0n) return quotient;
+  if (mode === 'floor') return numerator < 0n ? quotient - 1n : quotient;
+  return numerator < 0n ? quotient : quotient + 1n;
+}
+
+const DECIMAL_NUMBER = /^(-?)(\d+)(?:\.(\d+))?(?:e([+-]\d+))?$/;
+
+/**
+ * A finite number as the exact decimal its shortest round-trip string names:
+ * `110.15` → `{ int: 11015n, scale: 2 }`, so `110.15` means 110.15, not the
+ * binary double nearest to it.
+ */
+function decimalOf(value: number): { int: bigint; scale: number } {
+  const match = DECIMAL_NUMBER.exec(String(value));
+  if (match === null) throw new TypeError(`Cannot read ${value} as a decimal`);
+  const [, sign, whole, fraction = '', exponent = '0'] = match;
+  const digits = BigInt(`${sign}${whole}${fraction}`);
+  const power = Number(exponent) - fraction.length;
+  return power >= 0
+    ? { int: digits * 10n ** BigInt(power), scale: 0 }
+    : { int: digits, scale: -power };
+}
+
 /**
  * Apply an {@link FxSnapshot} to a source-currency amount.
  *
@@ -271,6 +299,13 @@ function roundMinor(raw: number, mode: FxRounding): number {
  * (USD has 2, JPY has 0). The conversion therefore goes
  * `minor → major → ×rate → base minor`, not a naive `amount × rate`, which is
  * off by 100× for any pair whose exponents differ.
+ *
+ * ## Exact, rounded once
+ *
+ * The rate is read as the decimal it prints as and the product is computed in
+ * BigInt: `minor × rate × baseFactor / sourceFactor`, rounded once. A float
+ * product misses exact half-way points (USD 5.30 × 110.15 = 583.795 BDT
+ * computes as 583.79499…), so it rounded to 58379 paisa instead of 58380.
  */
 export function convertWithSnapshot(
   source: Money,
@@ -283,10 +318,14 @@ export function convertWithSnapshot(
   if (!Number.isFinite(fx.rate)) {
     throw new TypeError(`FxSnapshot.rate must be finite, got ${fx.rate}`);
   }
-  const major = source.amount / minorUnitFactor(fx.sourceCurrency);
-  const raw = major * fx.rate * minorUnitFactor(fx.baseCurrency);
+  if (!Number.isInteger(source.amount)) {
+    throw new TypeError(`Money.amount must be an integer in minor units, got ${source.amount}`);
+  }
+  const rate = decimalOf(fx.rate);
+  const numerator = BigInt(source.amount) * rate.int * BigInt(minorUnitFactor(fx.baseCurrency));
+  const denominator = BigInt(minorUnitFactor(fx.sourceCurrency)) * 10n ** BigInt(rate.scale);
   return {
-    amount: roundMinor(raw, options.rounding ?? 'half-away-from-zero'),
+    amount: Number(divideMinor(numerator, denominator, options.rounding ?? 'half-away-from-zero')),
     currency: currencyCode(fx.baseCurrency),
   };
 }

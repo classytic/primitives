@@ -3,6 +3,26 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.31.1 — 2026-10-11
+
+### Fixed — `convertWithSnapshot` is exact (`./currency`)
+- The conversion was computed in floating point (`minor / sourceFactor × rate × baseFactor`) and then
+  rounded, so a result that lands EXACTLY on a rounding boundary could round the wrong way. USD 5.30 at
+  110.15 is exactly 583.795 BDT; the float product was 583.79499…, giving 58379 paisa instead of 58380.
+  Over 1..99,999 cents the float form was off by one minor unit for 134 amounts at 110.15, 1,455 at 117.35
+  and 1,379 at 122.35.
+- The rate is now read as the decimal it prints as (`String(rate)`, exponent form included) and the
+  conversion is done in BigInt, rounded once. Signature and rounding modes are unchanged
+  (`half-away-from-zero` default, `floor`, `ceil`).
+- What changes: only results that were wrong. Under `half-away-from-zero`, amounts whose exact value is a
+  half-way point now round away from zero (one minor unit up in magnitude). Under `floor` / `ceil`, amounts
+  whose exact value is an integer are no longer nudged one unit off it (USD 2.20 at 110.15 `ceil` was 24234,
+  now 24233). A negative amount that rounds to zero now returns `0`, not `-0`. Every other result is
+  identical (checked against the float form across ~10.9M amount × rate × currency-pair × mode cases).
+- `convertWithSnapshot` now throws `TypeError` for a non-integer `source.amount` (a `Money` invariant that
+  `money()` already enforces), rather than converting a fractional minor unit.
+- `reverseWithSnapshot` is unchanged.
+
 ## 0.31.0 — 2026-10-11
 
 ### Added — `./quantity`: the 6-decimal quantity grid for fractional stock and sale quantities
