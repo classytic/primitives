@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addQuantity,
   compareQuantity,
   isOnStep,
+  isOnStepStrict,
+  isQuantityStep,
   QUANTITY_SCALE,
   QuantityError,
   quantitiesEqual,
   quantityStepToGrid,
   snapQuantity,
+  subtractQuantity,
 } from '../../src/inventory/quantity.js';
 import { extendedAmount, unitCostRate } from '../../src/money/unit-cost-rate.js';
 
@@ -82,6 +86,82 @@ describe('isOnStep / compareQuantity', () => {
   it('returns the step in grid units', () => {
     expect(quantityStepToGrid(0.001)).toBe(1000n);
     expect(quantityStepToGrid(1)).toBe(1_000_000n);
+  });
+});
+
+describe('isQuantityStep', () => {
+  const candidates: unknown[] = [
+    1, 0.05, 0.001, 0.000001, 0.0000001, 0, -1, 0.5, 2.5, 1e-9, Number.NaN, Number.POSITIVE_INFINITY,
+    '1', null, undefined, {}, 0.1 + 0.2, 1e12 + 0.5,
+  ];
+
+  it('is true exactly when quantityStepToGrid accepts the step', () => {
+    for (const step of candidates) {
+      let accepted = true;
+      try {
+        quantityStepToGrid(step as number);
+      } catch {
+        accepted = false;
+      }
+      expect(isQuantityStep(step), `step ${String(step)}`).toBe(accepted);
+    }
+  });
+
+  it('refuses what is not a usable step and never throws', () => {
+    for (const bad of [0, -1, 0.0000001, Number.NaN, Number.POSITIVE_INFINITY, '1', null, undefined, {}]) {
+      expect(isQuantityStep(bad)).toBe(false);
+    }
+    for (const good of [1, 0.05, 0.000001, 2.5]) expect(isQuantityStep(good)).toBe(true);
+  });
+});
+
+describe('isOnStepStrict', () => {
+  it('accepts an on-grid multiple of a valid step', () => {
+    expect(isOnStepStrict(2.35, 0.05)).toBe(true);
+    expect(isOnStepStrict(1.5, 0.5)).toBe(true);
+    expect(isOnStepStrict(3, 1)).toBe(true);
+  });
+
+  it('refuses a quantity off the step', () => {
+    expect(isOnStepStrict(2.33, 0.05)).toBe(false);
+    expect(isOnStepStrict(1.5, 1)).toBe(false);
+  });
+
+  it('does not snap: a 7th decimal is off the grid, where isOnStep accepts it', () => {
+    expect(isOnStep(2.3500004, 0.001)).toBe(true);
+    expect(isOnStepStrict(2.3500004, 0.001)).toBe(false);
+  });
+
+  it('is total: junk answers false and never throws', () => {
+    for (const q of [Number.NaN, Number.POSITIVE_INFINITY, -Number.POSITIVE_INFINITY, 1e300]) {
+      expect(isOnStepStrict(q, 1)).toBe(false);
+    }
+    for (const step of [0, -1, 0.0000001, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(isOnStepStrict(1, step)).toBe(false);
+    }
+  });
+});
+
+describe('addQuantity / subtractQuantity', () => {
+  it('sums on the grid, so a running total never drifts', () => {
+    expect(1.2 + 1.15).not.toBe(2.35);
+    expect(addQuantity(1.2, 1.15)).toBe(2.35);
+    expect(addQuantity(0.1, 0.2)).toBe(0.3);
+  });
+
+  it('subtracts on the grid', () => {
+    expect(10 - 2.35 - 2.35).not.toBe(5.3);
+    expect(subtractQuantity(subtractQuantity(10, 2.35), 2.35)).toBe(5.3);
+  });
+
+  it('returns 0, never -0', () => {
+    expect(Object.is(subtractQuantity(1.5, 1.5), 0)).toBe(true);
+    expect(Object.is(addQuantity(-0.5, 0.5), 0)).toBe(true);
+  });
+
+  it('refuses a non-finite operand like the rest of the grid', () => {
+    expect(() => addQuantity(Number.NaN, 1)).toThrow(QuantityError);
+    expect(() => subtractQuantity(1, Number.POSITIVE_INFINITY)).toThrow(QuantityError);
   });
 });
 

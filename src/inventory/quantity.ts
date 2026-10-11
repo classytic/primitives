@@ -101,9 +101,48 @@ export function isOnQuantityGrid(value: number): boolean {
   );
 }
 
-/** Is `quantity` a whole multiple of `step`, within half a grid unit? */
+/**
+ * Is `quantity` a whole multiple of `step`, within half a grid unit? Snaps `quantity` first and THROWS
+ * ({@link QuantityError}) on a non-finite quantity or an invalid step. Use {@link isOnStepStrict} where a
+ * malformed input must answer `false` instead.
+ */
 export function isOnStep(quantity: number, step: number): boolean {
   return quantityToGrid(quantity) % quantityStepToGrid(step) === 0n;
+}
+
+/**
+ * Is `step` a usable quantity step: a positive number on the grid, at least one grid unit? True exactly
+ * when {@link quantityStepToGrid} accepts it. A guard for untrusted input (a stored `quantityStep`, a
+ * request body) where a throw is the wrong answer.
+ */
+export function isQuantityStep(step: unknown): step is number {
+  return (
+    typeof step === 'number' &&
+    Number.isFinite(step) &&
+    step > 0 &&
+    isOnQuantityGrid(step) &&
+    quantityToGrid(step) > 0n
+  );
+}
+
+/**
+ * Is `quantity` ON the grid and a whole multiple of a valid `step`? STRICT and total: an off-grid or
+ * non-finite quantity, or an invalid step, is `false` — never a throw and never a snap (`2.3500004`
+ * is off the 0.001 step here, on it for {@link isOnStep}). The check for an input boundary, such as a
+ * line quantity against the line's step.
+ */
+export function isOnStepStrict(quantity: number, step: number): boolean {
+  return isOnQuantityGrid(quantity) && isQuantityStep(step) && isOnStep(quantity, step);
+}
+
+/** `a + b` on the grid, so a running sum never drifts (`1.2 + 1.15` is 2.35, not 2.3499…). */
+export function addQuantity(a: number, b: number): number {
+  return gridToNumber(quantityToGrid(a) + quantityToGrid(b));
+}
+
+/** `a − b` on the grid, so a running balance never drifts. */
+export function subtractQuantity(a: number, b: number): number {
+  return gridToNumber(quantityToGrid(a) - quantityToGrid(b));
 }
 
 /** Compare two quantities on the grid: equal when they snap to the same grid unit. */

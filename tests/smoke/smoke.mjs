@@ -107,6 +107,11 @@ const checks = [
   ['./quantity', 'QUANTITY_SCALE'],
   ['./usage-pricing', 'priceUsage'],
   ['./usage-pricing', 'UsagePricingError'],
+  // ─── 0.32.0 additions ────────────────────────────────────────────────
+  ['./quantity', 'isQuantityStep'],
+  ['./quantity', 'isOnStepStrict'],
+  ['./quantity', 'addQuantity'],
+  ['./quantity', 'subtractQuantity'],
 ];
 
 const failures = [];

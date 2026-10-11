@@ -3,6 +3,15 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.32.0 — 2026-10-12
+
+### Added — `./quantity`: the step and running-sum helpers every package was copying
+
+Seven packages (order, cart, catalog, invoice, bd-tax, commerce-ui, pos-ui) each carried their own copy of the quantity grid; the pieces the grid did not yet offer are now here, so a consumer imports instead of copying.
+- `isQuantityStep(step)` — a guard for a usable step (a positive number on the grid, at least one grid unit). True exactly when `quantityStepToGrid` accepts it, pinned by a property test. For untrusted input (a stored `quantityStep`, a request body), where a throw is the wrong answer.
+- `isOnStepStrict(quantity, step)` — is the quantity ON the grid and a whole multiple of a valid step? STRICT and total: junk, an off-grid quantity or an invalid step is `false`, never a throw and never a snap. `isOnStep` is unchanged (it snaps first and throws on a bad step; its docs now say so and point here).
+- `addQuantity(a, b)` / `subtractQuantity(a, b)` — arithmetic on the grid, so a running sum never drifts (`1.2 + 1.15` is `2.35`). Zero is `0`, never `-0`. A non-finite operand throws `QuantityError`, as everywhere in the grid.
+
 ## 0.31.1 — 2026-10-11
 
 ### Fixed — `convertWithSnapshot` is exact (`./currency`)
