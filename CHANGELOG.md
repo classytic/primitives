@@ -3,6 +3,15 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.33.0 — 2026-10-14
+
+### Changed — `inventory/line-settlement` settles decimal quantities on the 6-dp grid
+- `planSettlement`, `clampSettlement`, `settledTotal`, `outstandingOf`, `settledEntirelyIn` and `shareOfSettled` add, subtract and compare
+  on the grid (`addQuantity` / `subtractQuantity`), so 0.1 + 0.2 settles exactly 0.3 and a weighed line can be received in parts.
+  Whole-unit inputs behave as before.
+- A non-positive or off-grid request is refused with code `not_positive_quantity` (was `not_positive_integer`; no in-repo consumer
+  branches on the old code).
+
 ## 0.32.0 — 2026-10-12
 
 ### Added — `./quantity`: the step and running-sum helpers every package was copying

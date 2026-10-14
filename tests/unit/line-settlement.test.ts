@@ -11,7 +11,9 @@ import {
   outstandingOf,
   planSettlement,
   settledEntirelyIn,
+  settledTotal,
   settlementState,
+  shareOfSettled,
   type SettlementLine,
 } from "../../src/inventory/line-settlement.js";
 
@@ -61,7 +63,7 @@ describe("planSettlement refuses instead of trimming", () => {
     });
   });
 
-  it.each([0, -1, 1.5, Number.NaN])("refuses %s", (q) => {
+  it.each([0, -1, 1e-7, Number.NaN])("refuses %s", (q) => {
     const r = planSettlement(line(10), "received", q);
     expect(r.ok).toBe(false);
   });
@@ -97,5 +99,38 @@ describe("shareOfSettled — batch shares that always sum to the line", () => {
     expect(shareOfSettled(999, 3, 2, 2)).toBe(0);
     expect(() => shareOfSettled(999, 3, 2, 4)).toThrow(RangeError);
     expect(() => shareOfSettled(9.5, 3, 0, 1)).toThrow(RangeError);
+  });
+});
+
+describe("fractional quantities, exact on the 6-dp grid", () => {
+  it("settles 2.35 kg of 10 and leaves exactly 7.65", () => {
+    const r = planSettlement(line(10), "received", 2.35);
+    expect(r.ok && outstandingOf(r.value)).toBe(7.65);
+  });
+
+  it("a bucket adds without float drift: 0.1 then 0.2 is 0.3", () => {
+    const a = planSettlement(line(1), "received", 0.1);
+    const b = a.ok ? planSettlement(a.value, "received", 0.2) : a;
+    expect(b.ok && settledTotal(b.value)).toBe(0.3);
+    expect(b.ok && b.value.settled.received).toBe(0.3);
+    expect(b.ok && outstandingOf(b.value)).toBe(0.7);
+  });
+
+  it("refuses more than is outstanding, compared on the grid", () => {
+    const r = planSettlement(line(2.35), "received", 2.350001);
+    expect(r.ok).toBe(false);
+  });
+
+  it("clamp takes what fits and floors a request off the grid", () => {
+    expect(clampSettlement(line(2.35), "received", 5).applied).toBe(2.35);
+    expect(clampSettlement(line(10), "received", 1.2345678).applied).toBe(1.234567);
+  });
+
+  it("shares of a line amount telescope to the total across fractional batches", () => {
+    const total = 18_200;
+    const a = shareOfSettled(total, 2.35, 0, 0.35);
+    const b = shareOfSettled(total, 2.35, 0.35, 2.35);
+    expect(a + b).toBe(total);
+    expect(a).toBe(2_710);
   });
 });

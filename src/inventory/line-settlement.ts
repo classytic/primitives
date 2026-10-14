@@ -1,4 +1,5 @@
 import { err, ok, type Result } from "../composition/result.js";
+import { addQuantity, compareQuantity, isOnQuantityGrid, QUANTITY_SCALE, quantityToGrid, snapQuantity, subtractQuantity } from "./quantity.js";
 
 /**
  * A document line's quantity, split into OUTCOME buckets — the one definition
@@ -10,7 +11,8 @@ import { err, ok, type Result } from "../composition/result.js";
  * kernel's vocabulary; the arithmetic, the over-settlement guard and the state
  * derivation are this file's, so no two kernels can answer differently.
  *
- * Quantities are whole units. A bucket that is absent counts as zero.
+ * Quantities are decimals on the 6-dp grid (`./quantity`): whole units for a countable item, 2.35 for a weighed one.
+ * Every sum and comparison is exact on the grid. A bucket that is absent counts as zero.
  */
 export interface SettlementLine<B extends string> {
   /** What the line promised to move. */
@@ -23,7 +25,7 @@ export type SettlementState = "open" | "partial" | "settled";
 
 /** Sum of every bucket. */
 export const settledTotal = <B extends string>(line: SettlementLine<B>): number =>
-  Object.values<number | undefined>(line.settled).reduce<number>((sum, n) => sum + (n ?? 0), 0);
+  Object.values<number | undefined>(line.settled).reduce<number>((sum, n) => addQuantity(sum, n ?? 0), 0);
 
 /**
  * `quantity − Σ buckets`. NOT clamped at zero: a negative means the line was
@@ -31,7 +33,7 @@ export const settledTotal = <B extends string>(line: SettlementLine<B>): number 
  * would erase the only signal that happened.
  */
 export const outstandingOf = <B extends string>(line: SettlementLine<B>): number =>
-  line.quantity - settledTotal(line);
+  subtractQuantity(line.quantity, settledTotal(line));
 
 /** `open` — nothing settled; `settled` — nothing outstanding; otherwise `partial`. */
 export const settlementState = <B extends string>(line: SettlementLine<B>): SettlementState => {
@@ -53,16 +55,16 @@ export const documentSettlementState = <B extends string>(
 export const settledEntirelyIn = <B extends string>(
   lines: ReadonlyArray<SettlementLine<B>>,
   bucket: B,
-): boolean => lines.every((l) => (l.settled[bucket] ?? 0) >= l.quantity);
+): boolean => lines.every((l) => compareQuantity(l.settled[bucket] ?? 0, l.quantity) >= 0);
 
 export type SettlementRefusal =
-  | { readonly code: "not_positive_integer"; readonly requested: number }
+  | { readonly code: "not_positive_quantity"; readonly requested: number }
   | { readonly code: "exceeds_outstanding"; readonly requested: number; readonly outstanding: number };
 
 /**
  * Settle `quantity` more units into `bucket`, or refuse.
  *
- * Refuses a non-positive or fractional quantity and anything above what is
+* Refuses a non-positive quantity, one off the 6-dp grid, and anything above what is
  * outstanding — an over-settlement is an input error, never silently trimmed.
  * Use {@link clampSettlement} only where the surface's CONTRACT is "take what fits".
  */
@@ -71,9 +73,9 @@ export const planSettlement = <B extends string>(
   bucket: B,
   quantity: number,
 ): Result<SettlementLine<B>, SettlementRefusal> => {
-  if (!Number.isInteger(quantity) || quantity <= 0) return err({ code: "not_positive_integer", requested: quantity });
+  if (!(quantity > 0) || !isOnQuantityGrid(quantity)) return err({ code: "not_positive_quantity", requested: quantity });
   const outstanding = outstandingOf(line);
-  if (quantity > outstanding) return err({ code: "exceeds_outstanding", requested: quantity, outstanding });
+  if (compareQuantity(quantity, outstanding) > 0) return err({ code: "exceeds_outstanding", requested: quantity, outstanding });
   return ok(withBucket(line, bucket, quantity));
 };
 
@@ -86,7 +88,10 @@ export const clampSettlement = <B extends string>(
   bucket: B,
   requested: number,
 ): { readonly line: SettlementLine<B>; readonly applied: number } => {
-  const applied = Math.max(0, Math.min(Math.trunc(requested), outstandingOf(line)));
+  const wanted = requested > 0 ? (isOnQuantityGrid(requested) ? requested : Math.floor(requested * QUANTITY_SCALE) / QUANTITY_SCALE) : 0;
+  const fits = snapQuantity(wanted);
+  const outstanding = outstandingOf(line);
+  const applied = compareQuantity(fits, outstanding) <= 0 ? fits : Math.max(0, outstanding);
   return { line: applied > 0 ? withBucket(line, bucket, applied) : line, applied };
 };
 
@@ -94,21 +99,22 @@ export const clampSettlement = <B extends string>(
  * The share of a line-level amount (a value or a cost, integer MINOR units) owed by one
  * settlement batch, given how many units the whole line had settled before and after it.
  *
- * `floor(total·after/q) − floor(total·before/q)` TELESCOPES: however a line is split into
+ * `floor(total·after/q) − floor(total·before/q)` (units on the 6-dp grid) TELESCOPES: however a line is split into
  * batches, and across every outcome bucket, the shares sum to exactly `total` once the line
  * is fully settled — no remainder to chase, no batch-order dependence.
  */
 export const shareOfSettled = (total: number, quantity: number, settledBefore: number, settledAfter: number): number => {
   if (!Number.isInteger(total) || total < 0) throw new RangeError(`total must be a non-negative integer, got ${total}`);
-  if (!Number.isInteger(quantity) || quantity <= 0) throw new RangeError(`quantity must be a positive integer, got ${quantity}`);
-  if (!(0 <= settledBefore && settledBefore <= settledAfter && settledAfter <= quantity)) {
+  if (!(quantity > 0) || !isOnQuantityGrid(quantity)) throw new RangeError(`quantity must be positive with at most 6 decimals, got ${quantity}`);
+  if (!(0 <= settledBefore && compareQuantity(settledBefore, settledAfter) <= 0 && compareQuantity(settledAfter, quantity) <= 0)) {
     throw new RangeError(`need 0 <= before (${settledBefore}) <= after (${settledAfter}) <= quantity (${quantity})`);
   }
-  const at = (n: number) => Number((BigInt(total) * BigInt(n)) / BigInt(quantity));
+  const q = quantityToGrid(quantity);
+  const at = (n: number) => Number((BigInt(total) * quantityToGrid(n)) / q);
   return at(settledAfter) - at(settledBefore);
 };
 
 const withBucket =<B extends string>(line: SettlementLine<B>, bucket: B, quantity: number): SettlementLine<B> => ({
   quantity: line.quantity,
-  settled: { ...line.settled, [bucket]: (line.settled[bucket] ?? 0) + quantity },
+  settled: { ...line.settled, [bucket]: addQuantity(line.settled[bucket] ?? 0, quantity) },
 });
