@@ -45,6 +45,9 @@ describe('signed tokens', () => {
     expect(await verifyToken(token, () => undefined, { typ: TYP, now })).toEqual({ ok: false, reason: 'unknown_key' });
     expect(await verifyToken(token, () => other.verifying, { typ: TYP, now })).toEqual({ ok: false, reason: 'bad_signature' });
     expect(await verifyToken('a.b', keyOf, { typ: TYP, now })).toEqual({ ok: false, reason: 'malformed' });
+    // Impossible base64url length (len % 4 === 1) used to throw from atob instead of reporting malformed.
+    expect(await verifyToken('a.b.c', keyOf, { typ: TYP, now })).toEqual({ ok: false, reason: 'malformed' });
+    expect(await verifyToken('not.a.token', keyOf, { typ: TYP, now })).toEqual({ ok: false, reason: 'malformed' });
   });
 
   it('refuses a token with no expiry, an expired one, and one not yet valid', async () => {

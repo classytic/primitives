@@ -3,6 +3,17 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.34.0 — 2026-10-17
+
+### Added — geo distance helpers (`./identity/address`)
+
+- `distanceMeters(a, b)` — great-circle distance in metres (haversine, mean Earth radius 6,371,008.8 m; ~0.5% accurate: fine for geofences, not surveying). Throws `RangeError` on a non-finite or out-of-range WGS84 point.
+- `isWithinRadius(point, center, radiusMeters, { accuracyMeters, mode })` — is a point inside a circle, optionally counting the device's GPS uncertainty: `strict` (default, anti-cheat) needs the whole uncertainty circle inside, `lenient` accepts any overlap. Pinned by `tests/unit/geo-distance.test.ts`.
+
+### Fixed — a malformed signed token is `null`, not an exception (`./signed-token`)
+
+- Reading a token whose base64url body has an impossible length (`len % 4 === 1`) made `atob` throw out of the verifier. It now returns `null`, like every other malformed token.
+
 ## 0.33.0 — 2026-10-14
 
 ### Changed — `inventory/line-settlement` settles decimal quantities on the 6-dp grid

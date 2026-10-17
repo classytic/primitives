@@ -49,6 +49,62 @@ export function fromGeoJsonPoint(g: GeoJsonPoint): GeoPoint {
   return { longitude, latitude };
 }
 
+/** Mean Earth radius (IUGG), metres. */
+const EARTH_RADIUS_M = 6_371_008.8;
+
+const toRad = (deg: number): number => (deg * Math.PI) / 180;
+
+function assertValidPoint(p: GeoPoint, label: string): void {
+  if (
+    !Number.isFinite(p.latitude) ||
+    !Number.isFinite(p.longitude) ||
+    Math.abs(p.latitude) > 90 ||
+    Math.abs(p.longitude) > 180
+  ) {
+    throw new RangeError(`${label} is not a valid WGS84 point`);
+  }
+}
+
+/** Great-circle distance in metres (haversine). Accurate to ~0.5% — fine for geofences, not for surveying. */
+export function distanceMeters(a: GeoPoint, b: GeoPoint): number {
+  assertValidPoint(a, 'a');
+  assertValidPoint(b, 'b');
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLon / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+export interface WithinRadiusOptions {
+  /** GPS accuracy (radius of uncertainty) in metres, as reported by the device. */
+  accuracyMeters?: number;
+  /**
+   * How accuracy counts. `strict`: the whole uncertainty circle must be inside (anti-cheat default).
+   * `lenient`: any overlap counts. Ignored when `accuracyMeters` is absent.
+   */
+  mode?: 'strict' | 'lenient';
+}
+
+/** Whether `point` lies within `radiusMeters` of `center`, optionally accounting for GPS accuracy. */
+export function isWithinRadius(
+  point: GeoPoint,
+  center: GeoPoint,
+  radiusMeters: number,
+  options: WithinRadiusOptions = {},
+): boolean {
+  if (!Number.isFinite(radiusMeters) || radiusMeters < 0)
+    throw new RangeError('radiusMeters must be >= 0');
+  const d = distanceMeters(point, center);
+  const acc = options.accuracyMeters;
+  if (acc === undefined) return d <= radiusMeters;
+  if (!Number.isFinite(acc) || acc < 0) throw new RangeError('accuracyMeters must be >= 0');
+  return (options.mode ?? 'strict') === 'strict'
+    ? d + acc <= radiusMeters
+    : d - acc <= radiusMeters;
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CAPTURE FORMAT — how the address above is COLLECTED, per country
