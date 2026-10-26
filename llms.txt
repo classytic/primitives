@@ -1,0 +1,75 @@
+# primitives
+Pure domain building blocks. Import by subpath only (no root barrel). Need X -> use Y (subpath).
+Skill: skills/primitives/SKILL.md
+
+Money
+/money: add, sum, compare Money (addMoney, fromMajor, sumMoney)
+/currency: FX, codes (convertWithSnapshot, minorUnitFactor)
+/split-allocation: exact splits (allocate, allocateDiscount)
+/unit-cost-rate: fractional cost (unitCostRateFromTotal, extendedAmount)
+/price-basis: price by weight or time (resolvePriceBasisTotal)
+/usage-pricing: rate cards (priceUsage)
+/monetization: sale kinds (unitPriceOf, monetizationKindOf)
+/proration: period shares (periodProgress, splitByPeriodFraction)
+/payment-gateway, /payment-method-kind, /payment-allocation-status, /bank-transaction: payment and bank shapes
+/payment-events: payment payloads (isPaymentEvent, isFundsReceived)
+
+Time
+/timezone: day in a zone (civilDateOf, addCivilDays)
+/period: month, quarter, fiscal ranges (resolveMonth, resolvePeriod)
+/calendar: fixed-offset day helpers (startOfDay, addMonths)
+/calendar-facts: holiday tables (defineDateEdition, lookupDateFact)
+/cadence: recurrence (nextOccurrence)
+/sla, /sla-policy: targets (breachedAt, evaluateSLAStatus)
+/deadline: promise timeout (withDeadline)
+/shelf-life: expiry dates (deriveShelfLifeDates)
+/suspension: pause rules (evaluateSuspension)
+
+Events
+/events: envelope (createEvent, createChildEvent)
+/event-infra: dev bus (createInProcessBus)
+/memory-outbox: test outbox (MemoryOutboxStore)
+/outbox: OutboxStore contract
+/durable-events: durable emit (durableEventMeta, dispatchDomainEvent)
+
+Workflow
+/state-machine: lifecycle (defineStateMachine, assertAndClaim)
+/state-diagram: mermaid (toMermaid)
+/status-history: audit trail (appendStatus, timeInStatus)
+/approval: maker-checker (createChain, applyDecision)
+/idempotency: retries (decideClaim, completeClaim)
+/hold: blocks (addHold, isOnHold)
+/condition: stored rules (evaluate)
+
+People
+/person, /person-parse: names (formatDisplayName, nameFromString)
+/phone: E.164 (parsePhone)
+/otp: codes (createOtpChallenge, verifyOtpChallenge)
+/identity-verification: KYC (isVerified)
+/subject: polymorphic ref (makeSubjectRef)
+/legal-form: LEGAL_FORMS
+/address: geo, formats (distanceMeters, validateAddress)
+
+Stock
+/quantity: decimal grid (addQuantity, snapQuantity)
+/stock-level: sellable, isOversold
+/item-identity: stockKeyOf, skuDisplay
+/item-stock: itemStockOf
+/item-facts: resolveStockFacts
+/line-settlement: planSettlement
+/testing/stock-key-seam: assertStockKeySeam
+
+Base
+/result: ok, err
+/brand: type helpers
+/reference: idToString, ExternalRef
+/context: OperationContext
+/mixin: withMixin, getMixin
+/environment: readEnv, isProductionEnv
+/fault-attribution: attributeFault
+/signed-token: signToken, verifyToken
+/canonical: canonicalDigest
+/csv: escapeCsvCell
+/retention: createPurgeEvidence
+
+Not here: pagination, tenant, errors (@classytic/repo-core).

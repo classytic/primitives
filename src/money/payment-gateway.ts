@@ -172,6 +172,13 @@ export interface PaymentResult {
   paidAt?: Date;
   /** Canonical method kind chosen by the customer (typically known post-settlement). */
   methodKind?: PaymentMethodKind;
+  /**
+   * The gateway's PAYMENT object id, when `id` names something else. A hosted
+   * checkout verifies by its session (`id` = `cs_…`) while refunds, disputes and
+   * charges only ever name the payment (`pi_…`); reporting it here lets the engine
+   * link those later events back to this payment.
+   */
+  paymentIntentId?: string;
   /** Pass-through metadata (gateway customer id, fee breakdown, etc.). */
   metadata?: Record<string, unknown>;
   /** Raw response — audit only. */
@@ -204,6 +211,26 @@ export interface RefundResult {
 // ─── Webhook ─────────────────────────────────────────────────────────────
 
 /**
+ * A refund the GATEWAY reports as completed — however it was initiated (the
+ * engine's own refund verb, or the gateway's dashboard/API directly).
+ *
+ * Only a SUCCEEDED refund is ever signalled; pending/failed ones are not.
+ */
+export interface ProviderRefundSignal {
+  /** Gateway-scoped refund id (Stripe `re_…`) — the dedup key. */
+  id: string;
+  /** This refund's amount, integer minor units (one refund, not the running total). */
+  amount: number;
+  /**
+   * The engine's own refund command ref, when the engine initiated this refund
+   * (stamped into the gateway refund's metadata at request time). Present → the
+   * engine's refund/reconcile path already owns it; absent → it came from outside
+   * and the engine must record it.
+   */
+  commandRef?: string;
+}
+
+/**
  * Parsed webhook event from a gateway's HTTP delivery. Engine stamps
  * `id` on the Transaction's `webhook.eventId` for atomic dedup —
  * replays of the same `id` are no-ops.
@@ -228,6 +255,8 @@ export interface WebhookEvent {
   data: {
     sessionId?: string;
     paymentIntentId?: string;
+    /** Set when the event reports a completed refund — see {@link ProviderRefundSignal}. */
+    refund?: ProviderRefundSignal;
     [key: string]: unknown;
   };
   /** When the gateway emitted the event. */

@@ -3,6 +3,15 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.35.0 — 2026-10-27
+
+### Added — gateway-reported refunds and payment links (`./payment-gateway`)
+
+Additive and optional; existing providers and engines are unaffected.
+
+- `PaymentResult.paymentIntentId` — the gateway's payment object id when `id` names something else. A hosted checkout verifies by its session (`cs_…`), but refunds, disputes and charges only name the payment (`pi_…`); reporting it lets the engine link those later events to the payment.
+- `ProviderRefundSignal` `{ id, amount, commandRef? }` and `WebhookEvent.data.refund` — a refund the gateway reports as SUCCEEDED, however it was initiated. `commandRef` is the engine's own refund command ref when the engine started the refund; its absence means the refund came from outside (e.g. the gateway dashboard) and must be recorded.
+
 ## 0.34.0 — 2026-10-17
 
 ### Added — geo distance helpers (`./identity/address`)

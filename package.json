@@ -1,6 +1,6 @@
 {
   "name": "@classytic/primitives",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "description": "Framework-agnostic TypeScript primitives shared across Classytic packages — Money, events, pagination, tenant config, and other building blocks.",
   "author": "Classytic",
   "license": "MIT",
@@ -330,6 +330,8 @@
   },
   "files": [
     "dist",
+    "skills",
+    "llms.txt",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
@@ -346,8 +348,9 @@
     "test:all": "vitest run",
     "test:watch": "vitest --project unit --project integration",
     "test:smoke": "node tests/smoke/smoke.mjs",
+    "check-skills": "node scripts/check-skills.mjs",
     "push": "classytic-push",
-    "prepublishOnly": "npm run typecheck && npm run test && npm run build && npm run test:smoke",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build && npm run test:smoke && npm run check-skills",
     "release": "npm run build && npm run typecheck && npm publish --access public"
   },
   "devDependencies": {
