@@ -10,6 +10,7 @@ A chain has an `order` (`sequential` or `parallel`), `steps[]` and an overall `s
 - Read: `nextPendingStep(chain)`, `pendingSteps(chain)`, `decidableStepIds(chain, actorId)` (steps this actor may decide now), `isApproved`, `isRejected`, `isPending`, `isNotRequired`, `decisionCount`.
 - `notRequiredChain(reason)` is already `approved` and passes `assertApproved`; record the reason for the audit trail.
 - Gate a mutation: `assertApproved(chain)` throws `CHAIN_MISSING` for no chain and `CHAIN_INCOMPLETE` otherwise; `assertApprovedIfPresent(chain)` allows a missing chain.
+- JSON: `chainToJson(chain)` -> `ApprovalChainJson` (every instant an ISO string, no `undefined` keys, invalid instant throws `RangeError`); the response and evidence form, a `DecidableChain`.
 - Wire constants for routes: `APPROVAL_ACTIONS` (`submit_for_approval`, `decide`), `APPROVAL_DECISIONS`, `APPROVAL_CHAIN_SOURCES`, `APPROVAL_NOTE_MAX_LENGTH` (1000), `ApprovalSubmitBody`, `ApprovalDecideBody`.
 
 ```ts

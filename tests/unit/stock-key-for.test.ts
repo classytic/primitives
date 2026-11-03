@@ -11,7 +11,7 @@
  *   C. a SIBLING's label IS its legacy key â€” collapsing must not break it.
  */
 import { describe, expect, it } from 'vitest';
-import { stockKeyFor, type StockKeySource } from '../../src/identity/item-identity.js';
+import { type StockKeySource, stockKeyFor } from '../../src/identity/item-identity.js';
 
 const PID = '6a8fb427000071ac652e1368';
 
@@ -57,13 +57,15 @@ describe('stockKeyFor', () => {
   it('the STAMP always wins, by every route', () => {
     expect(stockKeyFor(soleStamped, { kind: 'sole' })).toBe(PID);
     expect(stockKeyFor(siblings, { kind: 'label', sku: 'BLUE' })).toBe('ref-blue');
-    expect(stockKeyFor(siblings, { kind: 'variant', variant: { sku: 'BLUE', skuRef: 'ref-blue' } })).toBe(
-      'ref-blue',
-    );
+    expect(
+      stockKeyFor(siblings, { kind: 'variant', variant: { sku: 'BLUE', skuRef: 'ref-blue' } }),
+    ).toBe('ref-blue');
   });
 
   it('C. a SIBLING with no stamp keys by its LABEL â€” the legacy convention', () => {
-    expect(stockKeyFor(siblingsUnstamped, { kind: 'variant', variant: { sku: 'RED' } })).toBe('RED');
+    expect(stockKeyFor(siblingsUnstamped, { kind: 'variant', variant: { sku: 'RED' } })).toBe(
+      'RED',
+    );
     expect(stockKeyFor(siblingsUnstamped, { kind: 'label', sku: 'BLUE' })).toBe('BLUE');
   });
 
@@ -75,14 +77,21 @@ describe('stockKeyFor', () => {
   it('a BLANK stamp is not a key â€” it falls through, it does not win', () => {
     // `''` and `'  '` are absent, not identity. A blank skuRef seeding a quant
     // is a row every reader misses.
-    expect(stockKeyFor({ _id: PID, variants: [{ sku: 'X', skuRef: '' }] }, { kind: 'sole' })).toBe(PID);
+    expect(stockKeyFor({ _id: PID, variants: [{ sku: 'X', skuRef: '' }] }, { kind: 'sole' })).toBe(
+      PID,
+    );
     expect(
-      stockKeyFor({ _id: PID, variants: [{ sku: 'X', skuRef: '   ' }] }, { kind: 'variant', variant: { sku: 'X', skuRef: '   ' } }),
+      stockKeyFor(
+        { _id: PID, variants: [{ sku: 'X', skuRef: '   ' }] },
+        { kind: 'variant', variant: { sku: 'X', skuRef: '   ' } },
+      ),
     ).toBe(PID);
   });
 
   it('an ObjectId-ish _id is stringified once', () => {
-    expect(stockKeyFor({ _id: { toString: () => PID }, variants: [{ sku: 'X' }] }, { kind: 'sole' })).toBe(PID);
+    expect(
+      stockKeyFor({ _id: { toString: () => PID }, variants: [{ sku: 'X' }] }, { kind: 'sole' }),
+    ).toBe(PID);
   });
 
   it('falsification: the OLD split answered differently here', () => {

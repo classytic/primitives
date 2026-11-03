@@ -180,7 +180,10 @@ function requirePart(result: SplitResult, id: string): number {
  */
 export function apportion(total: number, part: number, whole: number): number {
   if (![total, part, whole].every(Number.isInteger) || whole <= 0 || part < 0 || part > whole) {
-    throw new ProrationError('INVALID_FRACTION', `cannot apportion ${total} by ${part} of ${whole}`);
+    throw new ProrationError(
+      'INVALID_FRACTION',
+      `cannot apportion ${total} by ${part} of ${whole}`,
+    );
   }
   const result = allocate(
     total,

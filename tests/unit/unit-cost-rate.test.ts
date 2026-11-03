@@ -5,8 +5,8 @@ import {
   isUnitCostRate,
   RATE_SCALE,
   rateMinorPerUnit,
-  unitCostRate,
   UnitCostRateError,
+  unitCostRate,
   unitCostRateFromTotal,
   weightedAverageScaledRate,
 } from '../../src/money/unit-cost-rate.js';
@@ -98,11 +98,15 @@ describe('line totals reconcile to a document total', () => {
 
   it('a top-down charge splits across lines with no lost minor unit (via allocate)', () => {
     // Freight of 1000 paisa across 3 lines by value — reuses split-allocation.
-    const freight = allocate(1000, [
-      { id: 'L1', weight: 300 },
-      { id: 'L2', weight: 300 },
-      { id: 'L3', weight: 400 },
-    ], 'by-value');
+    const freight = allocate(
+      1000,
+      [
+        { id: 'L1', weight: 300 },
+        { id: 'L2', weight: 300 },
+        { id: 'L3', weight: 400 },
+      ],
+      'by-value',
+    );
     expect(freight.parts.reduce((a, p) => a + p.amount, 0)).toBe(1000);
   });
 });

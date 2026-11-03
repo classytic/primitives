@@ -103,7 +103,11 @@ export interface ApprovalRequest {
    * What the approval covers. A later amount above `basis.amount` is not covered. `unit` states the
    * amount is integer base-currency minor units; a stored amount without it is of unknown unit.
    */
-  readonly basis?: { readonly amount?: number; readonly unit?: 'minor'; readonly category?: string };
+  readonly basis?: {
+    readonly amount?: number;
+    readonly unit?: 'minor';
+    readonly category?: string;
+  };
 }
 
 export interface CreateChainInput {
@@ -346,7 +350,10 @@ export interface DecidableChain {
  * The steps `actorId` may decide now: active, naming the actor as an approver, not yet
  * decided by them. The ONE answer to "may this actor decide" for server and UI alike.
  */
-export function decidableStepIds(chain: DecidableChain, actorId: string | null | undefined): string[] {
+export function decidableStepIds(
+  chain: DecidableChain,
+  actorId: string | null | undefined,
+): string[] {
   if (!actorId || chain.status !== 'pending') return [];
   return pendingSteps(chain)
     .filter(
@@ -416,7 +423,9 @@ export function applyDecision(chain: ApprovalChain, input: DecisionInput): Appro
     decision: input.decision,
     ...(input.note !== undefined ? { note: input.note } : {}),
     decidedAt: input.decidedAt ?? new Date(),
-    ...(input.actorOrganizationId !== undefined ? { actorOrganizationId: input.actorOrganizationId } : {}),
+    ...(input.actorOrganizationId !== undefined
+      ? { actorOrganizationId: input.actorOrganizationId }
+      : {}),
   };
 
   const updatedStep = computeStepStatus({
@@ -563,6 +572,99 @@ export function isPending(chain: ApprovalChain): boolean {
  */
 export function decisionCount(chain: ApprovalChain): number {
   return chain.steps.reduce((n, s) => n + s.decisions.length, 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// JSON form
+// ─────────────────────────────────────────────────────────────────────────
+
+/** `T` as JSON carries it: every `Date` an ISO-8601 string. */
+type JsonOf<T> = T extends Date
+  ? string
+  : T extends readonly (infer U)[]
+    ? readonly JsonOf<U>[]
+    : T extends object
+      ? { readonly [K in keyof T]: JsonOf<T[K]> }
+      : T;
+
+/**
+ * An {@link ApprovalChain} on the wire: the same fields, every instant (`decidedAt`, `request.at`)
+ * an ISO-8601 UTC string. What {@link chainToJson} returns and what a client reads; it satisfies
+ * {@link DecidableChain}.
+ */
+export type ApprovalChainJson = JsonOf<ApprovalChain>;
+export type ApprovalStepJson = ApprovalChainJson['steps'][number];
+
+/**
+ * The JSON form of a chain, for a response body or an evidence record: every instant as an
+ * ISO-8601 UTC string, optional fields present only when set (no `undefined` keys), nothing
+ * shared with the input. Equal to `JSON.parse(JSON.stringify(chain))` for a stored chain, but
+ * typed, and an invalid instant throws `RangeError` instead of becoming `null`. Accepts a chain
+ * read back from JSON too (its instants are re-validated and normalised to UTC `Z` form).
+ */
+export function chainToJson(chain: ApprovalChain | ApprovalChainJson): ApprovalChainJson {
+  return {
+    order: chain.order,
+    status: chain.status,
+    steps: chain.steps.map((s) => ({
+      id: s.id,
+      ...(s.name !== undefined ? { name: s.name } : {}),
+      approvers: s.approvers.map((a) => ({
+        id: a.id,
+        ...(a.name !== undefined ? { name: a.name } : {}),
+        ...(a.role !== undefined ? { role: a.role } : {}),
+      })),
+      requiredApprovals: s.requiredApprovals,
+      ...(s.threshold !== undefined
+        ? { threshold: { field: s.threshold.field, op: s.threshold.op, value: s.threshold.value } }
+        : {}),
+      status: s.status,
+      decisions: s.decisions.map((d) => ({
+        approverId: d.approverId,
+        decision: d.decision,
+        ...(d.note !== undefined ? { note: d.note } : {}),
+        decidedAt: isoInstant(d.decidedAt, 'decidedAt'),
+        ...(d.actorOrganizationId !== undefined
+          ? { actorOrganizationId: d.actorOrganizationId }
+          : {}),
+      })),
+      ...(s.skippedReason !== undefined ? { skippedReason: s.skippedReason } : {}),
+    })),
+    ...(chain.notRequiredReason !== undefined
+      ? { notRequiredReason: chain.notRequiredReason }
+      : {}),
+    ...(chain.request !== undefined
+      ? {
+          request: {
+            by: chain.request.by,
+            at: isoInstant(chain.request.at, 'request.at'),
+            ...(chain.request.basis !== undefined
+              ? {
+                  basis: {
+                    ...(chain.request.basis.amount !== undefined
+                      ? { amount: chain.request.basis.amount }
+                      : {}),
+                    ...(chain.request.basis.unit !== undefined
+                      ? { unit: chain.request.basis.unit }
+                      : {}),
+                    ...(chain.request.basis.category !== undefined
+                      ? { category: chain.request.basis.category }
+                      : {}),
+                  },
+                }
+              : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+function isoInstant(value: Date | string, field: string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError(`chainToJson: ${field} is not a valid instant (${String(value)}).`);
+  }
+  return date.toISOString();
 }
 
 // ─────────────────────────────────────────────────────────────────────────

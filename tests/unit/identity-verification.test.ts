@@ -62,15 +62,13 @@ describe('deriveStatus', () => {
   });
 
   it('all required pass → verified', () => {
-    expect(
-      deriveStatus([{ check: 'document', outcome: 'pass' }], ['document']),
-    ).toBe('verified');
+    expect(deriveStatus([{ check: 'document', outcome: 'pass' }], ['document'])).toBe('verified');
   });
 
   it('required not all present → processing', () => {
-    expect(
-      deriveStatus([{ check: 'document', outcome: 'pass' }], ['document', 'liveness']),
-    ).toBe('processing');
+    expect(deriveStatus([{ check: 'document', outcome: 'pass' }], ['document', 'liveness'])).toBe(
+      'processing',
+    );
   });
 
   it('no required checks → processing (cannot conclude verified)', () => {

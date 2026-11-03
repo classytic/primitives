@@ -50,3 +50,42 @@ export function escapeCsvCell(value: unknown): string {
   const text = neutralizeCsvFormula(value);
   return NEEDS_QUOTING.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
+
+// ─── Records and whole tables ────────────────────────────────────────────────
+
+/** The UTF-8 byte order mark spreadsheet apps need to read a CSV as UTF-8 (Arabic, accents). */
+export const CSV_BOM = '\uFEFF';
+
+/**
+ * One CSV record: every cell through {@link escapeCsvCell}, comma-separated,
+ * CRLF-terminated (RFC 4180). `null` / `undefined` cells are empty.
+ */
+export function csvRecord(cells: readonly unknown[]): string {
+  return `${cells.map(escapeCsvCell).join(',')}\r\n`;
+}
+
+/** A header row and data rows; rows may be produced lazily (a cursor, a generator). */
+export interface CsvTable {
+  header: readonly unknown[];
+  rows: Iterable<readonly unknown[]> | AsyncIterable<readonly unknown[]>;
+}
+
+export interface CsvLinesOptions {
+  /** Prefix the first record with {@link CSV_BOM}. Default `true` (the reader is a spreadsheet). */
+  bom?: boolean;
+}
+
+/**
+ * A whole table as CSV text, one record per yielded string. Lazy: a row is
+ * pulled from `rows` only when the consumer asks for the next line, so a
+ * streamed export never holds the table in memory. Runtime-free; on Node wrap
+ * it with `Readable.from(csvLines(table))`, on the web with
+ * `ReadableStream.from(...)`.
+ */
+export async function* csvLines(
+  table: CsvTable,
+  options: CsvLinesOptions = {},
+): AsyncGenerator<string, void, undefined> {
+  yield `${options.bom === false ? '' : CSV_BOM}${csvRecord(table.header)}`;
+  for await (const row of table.rows) yield csvRecord(row);
+}

@@ -105,7 +105,6 @@ export function isWithinRadius(
     : d - acc <= radiusMeters;
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════════
 // CAPTURE FORMAT — how the address above is COLLECTED, per country
 // ═══════════════════════════════════════════════════════════════════════════
@@ -312,7 +311,10 @@ export const INTERNATIONAL_ADDRESS_FORMAT: AddressFormat = {
 };
 
 /** Look a CANONICAL field up by its key. Extension fields have no `key`. */
-export function fieldSpec(format: AddressFormat, key: AddressFieldKey): AddressFieldSpec | undefined {
+export function fieldSpec(
+  format: AddressFormat,
+  key: AddressFieldKey,
+): AddressFieldSpec | undefined {
   return format.fields.find((f) => !isExtensionField(f) && f.key === key) as
     | AddressFieldSpec
     | undefined;
@@ -348,8 +350,6 @@ export function requiredFieldNames(format: AddressFormat): string[] {
  */
 export type PartialAddress = Partial<Record<AddressFieldKey, string>> &
   Partial<Pick<ContactAddress, 'line1' | 'city' | 'country'>> & { [extension: string]: unknown };
-
-
 
 /**
  * Country code → capture format. The host builds this, exactly as it builds the
@@ -389,13 +389,13 @@ export function resolveAddressFormat(
  * unlisted ones resolve to the fallback; this is for the common case of an
  * operator choosing among the markets actually configured.
  */
-export function supportedCountries(registry: AddressFormatRegistry): Array<{ code: string; label: string }> {
+export function supportedCountries(
+  registry: AddressFormatRegistry,
+): Array<{ code: string; label: string }> {
   return Object.entries(registry)
     .map(([code, format]) => ({ code, label: format.countryLabel }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }
-
-
 
 export interface AddressFieldError {
   /**

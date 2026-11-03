@@ -7,12 +7,12 @@
  * "customer is responsible" from "nobody decided", which is why `unknown` is a
  * real member here and is asserted throughout.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   attributeFault,
   bearsCost,
-  needsFaultReview,
   type FaultParty,
+  needsFaultReview,
 } from '../../src/composition/fault-attribution.js';
 
 const RETURN_FAULT = {
@@ -46,7 +46,9 @@ describe('attributeFault', () => {
   it('is STICKY: one merchant-fault line attributes the whole claim', () => {
     // A customer returning three items, one defective, is not asked to
     // part-pay the shipping.
-    expect(attributeFault(RETURN_FAULT, ['changed_mind', 'defective', 'wrong_size'])).toBe('merchant');
+    expect(attributeFault(RETURN_FAULT, ['changed_mind', 'defective', 'wrong_size'])).toBe(
+      'merchant',
+    );
   });
 
   it('prefers carrier over customer', () => {

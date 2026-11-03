@@ -276,7 +276,8 @@ function distributeExact(total: number, weights: readonly number[], weightSum: n
     .sort((a, b) => (a.rem === b.rem ? a.i - b.i : a.rem > b.rem ? -1 : 1));
   for (let k = 0; k < residue; k++) {
     const entry = order[k];
-    if (entry === undefined) throw new Error('split-allocation invariant: residue exceeds the subject count');
+    if (entry === undefined)
+      throw new Error('split-allocation invariant: residue exceeds the subject count');
     result[entry.i] = (result[entry.i] ?? 0) + 1;
   }
   return result;
@@ -306,25 +307,42 @@ export interface DiscountSubject {
  * `0` discount allocates zeros; a discount equal to the eligible base allocates all of it; a
  * discount above it throws `DISCOUNT_EXCEEDS_BASE` — the figures disagree.
  */
-export function allocateDiscount(discount: number, subjects: readonly DiscountSubject[]): ReadonlyMap<string, number> {
+export function allocateDiscount(
+  discount: number,
+  subjects: readonly DiscountSubject[],
+): ReadonlyMap<string, number> {
   if (!Number.isInteger(discount) || discount < 0) {
-    throw new SplitAllocationError('INVALID_TOTAL', `discount must be a non-negative integer, got ${discount}`);
+    throw new SplitAllocationError(
+      'INVALID_TOTAL',
+      `discount must be a non-negative integer, got ${discount}`,
+    );
   }
   const out = new Map<string, number>();
   for (const s of subjects) {
-    if (out.has(s.id)) throw new SplitAllocationError('DUPLICATE_SUBJECT_ID', `duplicate subject id: ${s.id}`);
+    if (out.has(s.id))
+      throw new SplitAllocationError('DUPLICATE_SUBJECT_ID', `duplicate subject id: ${s.id}`);
     if (!Number.isFinite(s.weight) || s.weight < 0) {
-      throw new SplitAllocationError('INVALID_WEIGHT', `subject ${s.id}: weight must be a non-negative number`);
+      throw new SplitAllocationError(
+        'INVALID_WEIGHT',
+        `subject ${s.id}: weight must be a non-negative number`,
+      );
     }
     out.set(s.id, 0);
   }
   const eligible = subjects.filter((s) => s.discountable !== false && s.weight > 0);
   const base = eligible.reduce((sum, s) => sum + s.weight, 0);
   if (discount > base) {
-    throw new SplitAllocationError('DISCOUNT_EXCEEDS_BASE', `discount ${discount} exceeds the discountable base ${base}`);
+    throw new SplitAllocationError(
+      'DISCOUNT_EXCEEDS_BASE',
+      `discount ${discount} exceeds the discountable base ${base}`,
+    );
   }
   if (discount === 0) return out;
-  for (const part of allocate(discount, eligible.map((s) => ({ id: s.id, weight: s.weight })), 'by-value').parts) {
+  for (const part of allocate(
+    discount,
+    eligible.map((s) => ({ id: s.id, weight: s.weight })),
+    'by-value',
+  ).parts) {
     out.set(part.id, part.amount);
   }
   return out;

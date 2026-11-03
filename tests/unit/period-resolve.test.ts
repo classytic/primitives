@@ -18,12 +18,12 @@ import {
   periodOf,
   periodTimeZone,
   resolveDateSpan,
-  shiftPeriod,
   resolveDay,
   resolveMonth,
   resolvePeriod,
   resolveQuarter,
   resolveYear,
+  shiftPeriod,
 } from '../../src/scheduling/period.js';
 
 const DHAKA = 'Asia/Dhaka'; // UTC+6, no DST
@@ -353,7 +353,10 @@ describe('shiftPeriod', () => {
       quarter: 4,
       timezone: DHAKA,
     });
-    expect(shiftPeriod({ year: 2026, timezone: DHAKA }, 3)).toEqual({ year: 2029, timezone: DHAKA });
+    expect(shiftPeriod({ year: 2026, timezone: DHAKA }, 3)).toEqual({
+      year: 2029,
+      timezone: DHAKA,
+    });
   });
 
   it('REFUSES an ad-hoc period — there is no unit to shift', () => {
@@ -380,12 +383,19 @@ describe('fiscalYearOf', () => {
 
   it('India (April start) and a January start', async () => {
     const { fiscalYearOf } = await import('../../src/scheduling/period.js');
-    expect(fiscalYearOf(new Date('2026-03-31T12:00:00Z'), { startMonth: 4, timezone: 'Asia/Kolkata' }).label).toBe('2025-26');
-    expect(fiscalYearOf(new Date('2026-05-01T12:00:00Z'), { startMonth: 1, timezone: 'UTC' }).label).toBe('2026');
+    expect(
+      fiscalYearOf(new Date('2026-03-31T12:00:00Z'), { startMonth: 4, timezone: 'Asia/Kolkata' })
+        .label,
+    ).toBe('2025-26');
+    expect(
+      fiscalYearOf(new Date('2026-05-01T12:00:00Z'), { startMonth: 1, timezone: 'UTC' }).label,
+    ).toBe('2026');
   });
 
   it('a century boundary keeps two digits', async () => {
     const { fiscalYearOf } = await import('../../src/scheduling/period.js');
-    expect(fiscalYearOf(new Date('2099-12-31T00:00:00Z'), { startMonth: 7, timezone: 'UTC' }).label).toBe('2099-00');
+    expect(
+      fiscalYearOf(new Date('2099-12-31T00:00:00Z'), { startMonth: 7, timezone: 'UTC' }).label,
+    ).toBe('2099-00');
   });
 });

@@ -18,12 +18,13 @@ Zero-dependency, ESM, Node 22+. Pure functions over plain data; no root barrel, 
 | FX conversion | `convertWithSnapshot` (`/currency`) |
 | Price by weight, time or rate card | `resolvePriceBasisTotal` (`/price-basis`), `priceUsage` (`/usage-pricing`) |
 | Fractional unit cost | `unitCostRateFromTotal`, `extendedAmount` (`/unit-cost-rate`) |
-| Calendar day in a zone, due dates | `civilDateOf`, `addCivilDays`, `civilDateToInstant` (`/timezone`) |
+| Zoned days, due dates, shifts | `civilDateOf`, `addCivilDays`, `wallWindowAt` (`/timezone`) |
 | Month, quarter, fiscal ranges | `resolveMonth`, `resolvePeriod`, `fiscalYearOf` (`/period`) |
 | Holiday tables with coverage | `defineDateEdition`, `lookupDateFact` (`/calendar-facts`) |
 | Recurrence rules | `nextOccurrence` (`/cadence`) |
 | Response and breach targets | `breachedAt` (`/sla`), `evaluateSLAStatus` (`/sla-policy`) |
 | Promise timeout | `withDeadline` (`/deadline`) |
+| Batch pool | `mapBounded` (`/concurrency`) |
 | Event envelope | `createEvent`, `createChildEvent` (`/events`) |
 | Dev bus, test outbox | `createInProcessBus` (`/event-infra`), `MemoryOutboxStore` (`/memory-outbox`) |
 | Durable emit in a transaction | `durableEventMeta`, `dispatchDomainEvent` (`/durable-events`) |
@@ -32,6 +33,7 @@ Zero-dependency, ESM, Node 22+. Pure functions over plain data; no root barrel, 
 | Maker-checker approvals | `createChain`, `applyDecision`, `assertApproved` (`/approval`) |
 | Safe request retries | `decideClaim`, `completeClaim` (`/idempotency`) |
 | Blocks on an entity | `addHold`, `isOnHold` (`/hold`) |
+| Pasted IDs | `cleanIdentifier` (`/identifier`) |
 | Phone, OTP, names | `parsePhone` (`/phone`), `createOtpChallenge` (`/otp`), `formatDisplayName` (`/person`) |
 | Decimal stock quantities and keys | `addQuantity` (`/quantity`), `stockKeyOf` (`/item-identity`), `sellable` (`/stock-level`) |
 | Partial receipt or fulfilment | `planSettlement` (`/line-settlement`) |

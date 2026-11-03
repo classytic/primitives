@@ -1,6 +1,6 @@
 {
   "name": "@classytic/primitives",
-  "version": "0.35.0",
+  "version": "0.36.0",
   "description": "Framework-agnostic TypeScript primitives shared across Classytic packages — Money, events, pagination, tenant config, and other building blocks.",
   "author": "Classytic",
   "license": "MIT",
@@ -241,6 +241,11 @@
       "types": "./dist/deadline.d.mts",
       "default": "./dist/deadline.mjs"
     },
+    "./concurrency": {
+      "@classytic/source": "./src/composition/concurrency.ts",
+      "types": "./dist/concurrency.d.mts",
+      "default": "./dist/concurrency.mjs"
+    },
     "./sla-policy": {
       "@classytic/source": "./src/scheduling/sla-policy.ts",
       "types": "./dist/sla-policy.d.mts",
@@ -286,6 +291,11 @@
       "@classytic/source": "./src/identity/item-identity.ts",
       "types": "./dist/item-identity.d.mts",
       "default": "./dist/item-identity.mjs"
+    },
+    "./identifier": {
+      "@classytic/source": "./src/identity/identifier.ts",
+      "types": "./dist/identifier.d.mts",
+      "default": "./dist/identifier.mjs"
     },
     "./stock-level": {
       "@classytic/source": "./src/inventory/stock-level.ts",
@@ -354,13 +364,13 @@
     "release": "npm run build && npm run typecheck && npm publish --access public"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.9",
-    "@classytic/dev-tools": "^0.2.0",
-    "@types/node": "^25.5.0",
-    "publint": "^0.3.23",
-    "tsdown": "^0.22.14",
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "@biomejs/biome": "^2.6.4",
+    "@classytic/dev-tools": "^0.2.1",
+    "@types/node": "^26.6.6",
+    "publint": "^0.3.25",
+    "tsdown": "^0.23.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
   },
   "keywords": [
     "typescript",

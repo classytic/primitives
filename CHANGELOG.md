@@ -3,6 +3,80 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.36.0 — 2026-11-03
+
+### Changed — dev toolchain
+
+TypeScript 7, tsdown 0.23, vitest 5, Biome 2.6 (formatting only; no runtime change). No peer dependencies.
+
+### Added — provider-confirmed execution readiness
+
+- `PaymentResult.confirmationReady` lets a provider query explicitly authorize first execution after customer approval. Return credentials do not authenticate a success/cancellation status string.
+
+### Added — private browser-return contract
+
+- `ProviderIntent.returnProof` carries a server-only token and validity window. Persist a digest before exposing checkout; never spread it into public metadata. `PaymentReturnCommand` and `PaymentReturnResult` share the normalized exchange contract with clients.
+
+### Added — explicit payment confirmation capability
+
+- `PaymentProviderPort.confirmPayment` is an optional mutating command, separate from read-only verification/status. `ProviderCapabilities` adds optional `supportsConfirmation`, `supportsIdempotentCreate` and `idempotentCreateWindowMs`; `PaymentResult` adds optional `merchantReference` for correlation. Existing adapter shapes remain structurally compatible. Engines must not infer gateway retry guarantees or their lifetime from a local idempotency key.
+
+Additive apart from one validator fix (below): no consumer needs to change.
+
+### Added — `./approval`: `chainToJson`, the JSON form of an approval chain
+
+- `chainToJson(chain)` returns `ApprovalChainJson` (also `ApprovalStepJson`): the same fields with every instant (`decidedAt`, `request.at`) as an ISO-8601 UTC string, optional fields only when set (no `undefined` keys), nothing shared with the stored chain. It keeps every field, including `threshold`, `actorOrganizationId` and `notRequiredReason`. An invalid instant throws `RangeError` (plain `JSON.stringify` sends `null`). A chain already read back from JSON is accepted and its instants are re-validated. The result is a `DecidableChain`, so `decidableStepIds` reads it on the client.
+- Migration (apps): FLOW OCC `chainWire` in `apps/server/src/modules/records/records.approval.ts` becomes `chainToJson`, and the contracts' structural copy `ApprovalChainWire` (`packages/contracts/src/records.ts`, and `HandoverApprovalChainWire`, which aliases it) becomes `ApprovalChainJson` (the package version also carries `threshold` and `actorOrganizationId` when set; contracts then depend on primitives for the type). The event-log purge chain can send the same form. erp-shell's `ApprovalChainJson` (`src/approval/types.ts`, `Date | string` instants) stays as the lenient read type; the primitives one is assignable to it.
+
+### Added — `./identifier`: identifiers pasted from Arabic, Persian and Indic spreadsheets
+
+Both FLOW apps (OCC and Training) carried the same `shared/identifiers.ts` byte for byte.
+- `asciiDigits(value)` — every non-ASCII Unicode decimal digit (`\p{Nd}`) to its ASCII digit: Arabic-Indic, Persian, Bengali, Devanagari, Thai, fullwidth, mathematical. Table-free (Unicode encodes decimal digits in aligned runs of ten).
+- `stripInvisible(value)` — removes every format character (`\p{Cf}`): zero-width, LRM/RLM, the Arabic letter mark U+061C, bidi embeddings and isolates, word joiner, soft hyphen, BOM. For identifiers, not prose (it drops ZWJ/ZWNJ).
+- `cleanIdentifier(value)` — `stripInvisible`, then NFKC, then `asciiDigits`, then trim. Idempotent (stripping first means a mark between a letter and its combining accent cannot survive as an uncomposed pair); keeps case and inner whitespace.
+- All three throw `TypeError` on a non-string (the app copies threw an incidental `TypeError` from `.replace` / `.normalize`).
+
+Migration (apps): replace the bodies of `shared/identifiers.ts` with imports from `@classytic/primitives/identifier` and keep the domain wrappers (`normaliseStaffNumber` = `cleanIdentifier(v).toUpperCase()`, etc.). The package version is a superset of the copy: it also strips U+061C, U+2060-2064, U+00AD and U+180E, and folds Bengali, Devanagari and the other digit systems the copy left alone. A stored identifier that contained one of those characters now normalises to a different (cleaner) key; re-normalise stored keys if any could contain them.
+
+### Added — `./timezone`: civil months and daily wall-clock windows
+
+- `addCivilMonths(cd, months)` — calendar months on a `CivilDate`, clamped to the target month's last day. Throws `TimeZoneError` on an invalid date, `RangeError` on a non-integer `months`.
+- `addCivilMonths` throws `RangeError` when the result would leave years 0000-9999.
+- `WallTime` (`'HH:mm'`), `parseWallTime(hhmm)` (minutes of day, strict, throws `TimeZoneError`), `wallTimeOf(instant, zone)`, `wallInstant(date, hhmm, zone)`.
+- `wallInstant` follows Temporal `disambiguation: 'compatible'` in every zone: a repeated fall-back time is its earlier occurrence, a skipped spring-forward time moves forward by the gap (New York 2026-03-08 02:30 is 03:30 EDT). It does not go through `civilDateToInstant`, which resolves gap times backward west of UTC (see Fixed).
+- `WallWindow { start, end }` (overnight when `end <= start`; `start === end` is 24 hours) and `WallWindowOccurrence<K> { key, date, range }`.
+- `resolveWallWindow(date, window, zone)` — half-open `DateRange`, DST-exact, never inverted. The range holds exactly the instants whose wall clock reads inside the window. A boundary inside a spring-forward gap is the moment the clock jumps (New York 2026-03-08 02:30 is 07:00Z, 03:00 EDT), not `wallInstant`'s forward-by-the-gap 03:30, so a 02:30-04:00 window keeps 03:00-03:30 EDT and contiguous calendars stay contiguous without overlap. A window wholly inside the gap (02:15-02:45) is empty and `wallWindowStartsBetween` skips it; a civil date the zone skipped (Pacific/Apia 2011-12-30) gives empty same-day windows, never a duplicate start.
+- `wallWindowAt(keyedWindows, instant, zone)` — the window in force, or `null` on a gap. Matches by instant, not wall minute, so the repeated fall-back hour is attributed to the right window. Overlaps: the most recently started wins.
+- `wallWindowStartsBetween(keyedWindows, from, to, zone)` — every start in `(from, to]`, sorted. Cost is linear in the days spanned; clamp `from` on a scheduler's first tick.
+
+Migration (apps): OCC `registry.time.ts` (`shiftWindow`, `shiftAt`, `shiftStartsBetween`, `zonedInstant`, `civilTimeIn`) becomes thin wrappers that add shift names and keep `shiftAt`'s throw on a gap; Training's `shared/civil-months.ts` becomes `addCivilMonths(civilDate(x), n)`. Behaviour difference from the OCC copy: during the repeated DST hour the copy attributed by wall minute and could name the window that had already ended.
+
+Migration for gap G-REG-1 (FLOW OCC, removal ticket REG-1): in `apps/server/src/modules/registry/registry.time.ts` delete the arithmetic and keep only the shift-naming wrappers: `civilTimeIn` -> `wallTimeOf`; `zonedInstant` -> `wallInstant`; `shiftWindow(shift, date, zone)` -> `resolveWallWindow(date, shift, zone)` plus `code` / `name` / `nameAr`; `shiftAt` -> `wallWindowAt(shifts.map((s) => ({ ...s, key: s.code })), instant, zone)`, throwing on `null` as today; `nextShiftAfter` -> `wallWindowAt(windows, current.range.end, zone)`; `shiftStartsBetween` -> `wallWindowStartsBetween`. Delete the local `overnight` and the single-24-hour-shift special case (the package handles `start === end` in any calendar). The existing `registry.time.test.ts` cases pass unchanged against the wrappers (the same cases, plus process zones UTC+14 and New York, are in the package suite). Riyadh has no DST, so OCC sees no instant change. In a DST zone, a shift boundary inside a spring-forward gap now resolves to the jump instant, so `wallWindowAt` names the same shift the copy's wall-minute match named (`civilDateToInstant` resolved it an hour early west of UTC).
+
+### Added — `./csv`: whole-table CSV, lazily
+
+The CSV half of the table-stream writer both FLOW apps copied byte for byte (gap G-PHASEB-4a).
+- `csvRecord(cells)` — one record: every cell through `escapeCsvCell`, comma-joined, CRLF-terminated.
+- `csvLines({ header, rows }, { bom? })` — async generator of records; the header goes through the same formula neutralisation; `CSV_BOM` (U+FEFF) first unless `bom: false`. `rows` may be a plain or async iterable and is pulled one row per line read, so a cursor-backed export never holds the table. No runtime dependency: on Node wrap with `Readable.from(...)`.
+- `CSV_BOM` constant.
+
+Not added here: the XLSX writer and the `tableStream(format, ...)` switch. They need `exceljs` and Node streams; primitives has no runtime dependencies, so they belong with arc's proposed list export (G13), or stay in the app.
+
+Migration for gap G-PHASEB-4a (FLOW OCC and FLOW Training, removal ticket PHASEB-4a, partial): in `apps/server/src/shared/table-stream.ts` delete `csvLine` and the body of `csvTable`, replacing it with `Readable.from(csvLines(table))` from `@classytic/primitives/csv` (byte-identical output: BOM, CRLF, header and cells through `escapeCsvCell`). `xlsxTable`, `tableStream`, `TABLE_CONTENT_TYPES`, `TableCell` / `TableBody` stay until the XLSX writer has a package home; the file is deleted only then. The CSV cases in `tests/unit/shared/list-export.test.ts` (BOM and quoting, lazy pull) are covered by the package's `csv-table.test.ts` and can stay as wrapper tests.
+
+### Added — `./concurrency`: bounded batch work
+
+- `mapBounded(items, concurrency, fn)` — worker pool, at most `concurrency` in flight, results in input order; the first rejection stops new work and rejects once in-flight calls settle. A `concurrency` below 1 (including `-Infinity`) runs one at a time, `Infinity` runs all, `NaN` throws `RangeError` (an unset `Number(process.env.X)` must not flood the database).
+- `chunked(items, size)` — consecutive chunks. Throws `RangeError` unless `size` is an integer >= 1 (the app copy looped forever on `size <= 0`).
+
+Migration (apps): delete `shared/concurrency.ts` and import from `@classytic/primitives/concurrency`; keep `DEFAULT_BATCH_CONCURRENCY` in app config.
+
+### Fixed
+- `isCivilDate` / `civilDate` accept `0000-02-29` (year 0 is an ISO leap year; `Date.UTC` read it as 1900). No other date changes validity.
+- Years 0000-0099: `addCivilDays`, `civilDaysBetween`, `isoWeekOfCivilDate` and `civilDateToInstant` no longer read them as 1900-1999 (`addCivilDays('0050-12-31', 1)` was `'1951-01-01'`, now `'0051-01-01'`; `civilDaysBetween('0099-12-31', '0100-01-01')` was -693959, now 1). `isoWeekOfCivilDate` pads the week-year to four digits (`'0050-W22'`); years 1000-9999 are unchanged. `addCivilDays` past 0000-01-01 or 9999-12-31 now throws `TimeZoneError` instead of wrapping into the 1900s. No consumer change needed.
+- `civilDateToInstant` JSDoc claimed Temporal `'compatible'` for spring-forward gap times. That holds east of UTC only: west of UTC (New York) a gap time resolves an hour early, before the gap. Behaviour is unchanged and the doc now says so. Migration: callers that need forward gap resolution for an `'HH:mm'` wall time should use `wallInstant`.
+- `civilDaysBetween`'s JSDoc sat above `isoWeekOfCivilDate`; moved to its function.
+
 ## 0.35.0 — 2026-10-27
 
 ### Added — gateway-reported refunds and payment links (`./payment-gateway`)

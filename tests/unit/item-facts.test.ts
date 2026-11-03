@@ -4,10 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { ItemStockSource as Item } from '../../src/inventory/item-facts.js';
-import {
-  resolveStockFacts,
-  type ProductFacet,
-} from '../../src/inventory/item-facts.js';
+import { type ProductFacet, resolveStockFacts } from '../../src/inventory/item-facts.js';
 
 const flour: Item = {
   skuRef: 'sku_flour',
@@ -109,7 +106,10 @@ describe('resolveStockFacts — the stock unit group', () => {
   const kgItem: Item = { ...flour, uomGroupRef: 'kg-milli' };
 
   it('BOTH — the Item group wins over a different product group', () => {
-    const facts = resolveStockFacts({ item: kgItem, product: { ...retailFlour, uomGroupRef: 'bag-whole' } });
+    const facts = resolveStockFacts({
+      item: kgItem,
+      product: { ...retailFlour, uomGroupRef: 'bag-whole' },
+    });
     expect(facts?.uomGroupRef).toBe('kg-milli');
     expect('unitOfMeasureDeclared' in (facts as object)).toBe(false);
   });
@@ -119,20 +119,28 @@ describe('resolveStockFacts — the stock unit group', () => {
   });
 
   it('PRODUCT ONLY — the product group is the fallback, and its declaration survives', () => {
-    expect(resolveStockFacts({ product: { ...retailFlour, uomGroupRef: 'kg-milli' } })?.uomGroupRef).toBe('kg-milli');
+    expect(
+      resolveStockFacts({ product: { ...retailFlour, uomGroupRef: 'kg-milli' } })?.uomGroupRef,
+    ).toBe('kg-milli');
     const lost = resolveStockFacts({ product: { ...retailFlour, unitOfMeasureDeclared: true } });
     expect(lost?.unitOfMeasureDeclared).toBe(true);
     expect('uomGroupRef' in (lost as object)).toBe(false);
   });
 
   it('never borrows the product group for an Item that declares none — it marks the unit declared so the engine refuses', () => {
-    const facts = resolveStockFacts({ item: flour, product: { ...retailFlour, uomGroupRef: 'kg-milli' } });
+    const facts = resolveStockFacts({
+      item: flour,
+      product: { ...retailFlour, uomGroupRef: 'kg-milli' },
+    });
     expect('uomGroupRef' in (facts as object)).toBe(false);
     expect(facts?.unitOfMeasureDeclared).toBe(true);
   });
 
   it('a product declaring a unit with its group lost still marks an ungrouped Item declared', () => {
-    const facts = resolveStockFacts({ item: flour, product: { ...retailFlour, unitOfMeasureDeclared: true } });
+    const facts = resolveStockFacts({
+      item: flour,
+      product: { ...retailFlour, unitOfMeasureDeclared: true },
+    });
     expect(facts?.unitOfMeasureDeclared).toBe(true);
   });
 

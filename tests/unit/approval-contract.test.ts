@@ -35,7 +35,11 @@ describe('decidableStepIds', () => {
   });
 
   it('advances with the chain and never re-offers a decided step', () => {
-    const after = applyDecision(twoStep(), { stepId: 'manager', approverId: 'm1', decision: 'approved' });
+    const after = applyDecision(twoStep(), {
+      stepId: 'manager',
+      approverId: 'm1',
+      decision: 'approved',
+    });
     expect(decidableStepIds(after, 'm1')).toEqual([]);
     expect(decidableStepIds(after, 'f1')).toEqual(['finance']);
   });
@@ -63,7 +67,11 @@ describe('decidableStepIds', () => {
   });
 
   it('answers nothing once the chain is settled', () => {
-    const rejected = applyDecision(twoStep(), { stepId: 'manager', approverId: 'm1', decision: 'rejected' });
+    const rejected = applyDecision(twoStep(), {
+      stepId: 'manager',
+      approverId: 'm1',
+      decision: 'rejected',
+    });
     expect(decidableStepIds(rejected, 'm2')).toEqual([]);
   });
 });

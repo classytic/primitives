@@ -3,8 +3,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  canonicalDigest,
   CanonicalizeError,
+  canonicalDigest,
   canonicalJson,
   sha256Hex,
 } from '../../src/serialization/canonical.js';

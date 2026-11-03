@@ -1,6 +1,6 @@
 # Scheduling: cadence, SLA, deadlines, shelf life, suspension
 
-Subpaths: `/cadence`, `/sla`, `/sla-policy`, `/deadline`, `/shelf-life`, `/suspension`. These work in instants (`Date`) and milliseconds. For calendar-day due dates use civil dates (`references/time.md`).
+Subpaths: `/cadence`, `/sla`, `/sla-policy`, `/deadline`, `/concurrency`, `/shelf-life`, `/suspension`. These work in instants (`Date`) and milliseconds. For calendar-day due dates use civil dates (`references/time.md`).
 
 ## /cadence
 Recurrence rules: `daily`, `weekly` (`daysOfWeek`, ISO 1 to 7), `monthly` (`dayOfMonth`), `yearly` (`month`, `dayOfMonth`), `cron`. Every cadence has `interval`, `startAt`, optional `endAt` and `timezone`.
@@ -35,6 +35,10 @@ Per-priority targets plus optional working hours.
 
 ## /deadline
 `withDeadline(promise, timeoutMs, label)` rejects with `DeadlineExceededError` after the timeout. It is a promise timeout, not a due-date calculator.
+
+## /concurrency
+- `mapBounded(items, concurrency, fn)`: at most `concurrency` calls in flight, results in input order. The first rejection stops new work and rejects after in-flight calls settle. Below 1 runs one at a time, `Infinity` runs all, `NaN` throws `RangeError` (an unset `Number(process.env.X)` must not flood).
+- `chunked(items, size)`: consecutive chunks; throws `RangeError` unless `size` is an integer >= 1.
 
 ## /shelf-life
 Lot or serial expiry dates. Policy: `{ mode: 'none'|'lot'|'serial', useExpiration, shelfLifeDays?, bestBeforeDays?, removalDays?, alertDays? }`.

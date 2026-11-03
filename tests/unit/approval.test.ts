@@ -3,17 +3,17 @@ import {
   type ApprovalChain,
   type ApprovalError,
   applyDecision,
+  assertApproved,
+  attachRequest,
   createChain,
   decisionCount,
   isApproved,
+  isNotRequired,
   isPending,
   isRejected,
   nextPendingStep,
-  pendingSteps,
-  isNotRequired,
   notRequiredChain,
-  assertApproved,
-  attachRequest,
+  pendingSteps,
   skipStep,
 } from '../../src/workflow/approval.js';
 
@@ -435,14 +435,25 @@ describe('attachRequest — maker-checker', () => {
         { id: 'cfo', approvers: [{ id: 'carol' }] },
       ],
     });
-    const attached = attachRequest(chain, { by: 'alice', at, basis: { amount: 500, category: 'asset' } });
+    const attached = attachRequest(chain, {
+      by: 'alice',
+      at,
+      basis: { amount: 500, category: 'asset' },
+    });
     expect(attached.steps[0]?.approvers.map((a) => a.id)).toEqual(['bob']);
     expect(attached.steps[1]?.approvers.map((a) => a.id)).toEqual(['carol']);
-    expect(attached.request).toEqual({ by: 'alice', at, basis: { amount: 500, category: 'asset' } });
+    expect(attached.request).toEqual({
+      by: 'alice',
+      at,
+      basis: { amount: 500, category: 'asset' },
+    });
   });
 
   it('throws NO_INDEPENDENT_APPROVER when the requester is the only approver', () => {
-    const chain = createChain({ order: 'sequential', steps: [{ id: 'mgr', approvers: [{ id: 'alice' }] }] });
+    const chain = createChain({
+      order: 'sequential',
+      steps: [{ id: 'mgr', approvers: [{ id: 'alice' }] }],
+    });
     try {
       attachRequest(chain, { by: 'alice', at });
       expect.unreachable('a chain only the requester can approve must throw');
@@ -468,7 +479,10 @@ describe('attachRequest — maker-checker', () => {
 
   it('applyDecision refuses SELF_APPROVAL and allows the requester to reject (withdraw)', () => {
     const chain = attachRequest(
-      createChain({ order: 'sequential', steps: [{ id: 'mgr', approvers: [{ id: 'alice' }, { id: 'bob' }] }] }),
+      createChain({
+        order: 'sequential',
+        steps: [{ id: 'mgr', approvers: [{ id: 'alice' }, { id: 'bob' }] }],
+      }),
       { by: 'alice', at },
     );
     try {
@@ -478,7 +492,10 @@ describe('attachRequest — maker-checker', () => {
       expect((e as ApprovalError).code).toBe('SELF_APPROVAL');
     }
     const withdrawn = applyDecision(
-      { ...chain, steps: chain.steps.map((s) => ({ ...s, approvers: [...s.approvers, { id: 'alice' }] })) },
+      {
+        ...chain,
+        steps: chain.steps.map((s) => ({ ...s, approvers: [...s.approvers, { id: 'alice' }] })),
+      },
       { stepId: 'mgr', approverId: 'alice', decision: 'rejected' },
     );
     expect(isRejected(withdrawn)).toBe(true);
@@ -495,7 +512,11 @@ describe('attachRequest — maker-checker', () => {
       }),
       { by: 'alice', at, basis: { amount: 900 } },
     );
-    const decided = applyDecision(chain, { stepId: 'mgr', approverId: 'bob', decision: 'approved' });
+    const decided = applyDecision(chain, {
+      stepId: 'mgr',
+      approverId: 'bob',
+      decision: 'approved',
+    });
     expect(decided.request).toEqual(chain.request);
     const skipped = skipStep(decided, 'cfo', 'below cfo threshold');
     expect(skipped.request).toEqual(chain.request);

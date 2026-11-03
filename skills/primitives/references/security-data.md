@@ -40,6 +40,15 @@ import { escapeCsvCell } from "@classytic/primitives/csv";
 console.log(["=SUM(A1)", "a,b", 'say "hi"', null].map(escapeCsvCell).join(","));
 ```
 
+A whole table: `csvRecord(cells)` is one escaped, CRLF-terminated record; `csvLines({ header, rows }, { bom? })` is an async generator of records (UTF-8 BOM `CSV_BOM` first unless `bom: false`) that pulls each row only when the consumer reads, so `rows` can be a database cursor. It has no runtime dependency: on Node, `Readable.from(csvLines(table))`. XLSX is not here (it needs a workbook library).
+
+```ts
+import { csvLines } from "@classytic/primitives/csv";
+
+async function* rows() { yield ["S1", "=HYPERLINK(\"x\")", 3]; }
+for await (const line of csvLines({ header: ["Code", "Name", "Count"], rows: rows() })) console.log(line);
+```
+
 ## /retention
 `PurgeEvidence` is the record that a purge happened (not a retention policy and not a TTL).
 - `createPurgeEvidence({ subject: { ref, model? }, scope, strategy, measuresRetained, processed, actor: { ref, kind }, reason, status?, legalBasis?, results?, verification?, occurredAt? })`. Strategies: `hard`, `soft`, `anonymize`. Status defaults to `completed`; `partial` and `failed` are allowed.

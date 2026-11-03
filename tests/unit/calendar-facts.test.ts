@@ -6,7 +6,6 @@
  * because a consumer that conflates them turns a half-entered dataset into a confident wrong verdict.
  */
 import { describe, expect, it } from 'vitest';
-import { civilDate } from '../../src/scheduling/timezone.js';
 import {
   defineDateEdition,
   defineDateFactCalendar,
@@ -16,6 +15,7 @@ import {
   lookupDateFactAt,
   type PublicHolidayEntry,
 } from '../../src/scheduling/calendar-facts.js';
+import { civilDate } from '../../src/scheduling/timezone.js';
 
 const AUTHORITY = { issuer: 'Ministry of Public Administration', reference: 'Gazette 2026/HOL/01' };
 
@@ -63,7 +63,7 @@ describe('lookupDateFact — the three states', () => {
     });
   });
 
-  it('a date outside a PRESENT edition\'s coverage is UNKNOWN', () => {
+  it("a date outside a PRESENT edition's coverage is UNKNOWN", () => {
     // The plan's named falsification: move `coverage.through` before the queried date.
     const partial = defineDateEdition<PublicHolidayEntry>({
       year: '2026',
@@ -97,7 +97,7 @@ describe('lookupDateFact — the three states', () => {
     expect(lookupDateFact(cal, civilDate('2026-05-01'))).toEqual({ kind: 'not-listed' });
   });
 
-  it('never produces `unattested` — that is the storage layer\'s to report', () => {
+  it("never produces `unattested` — that is the storage layer's to report", () => {
     // The reason exists in the union so a config layer can use the same shape. A pure function cannot
     // observe who vouched for the data, so it must not claim to.
     const cal = calendar([{ date: '2026-02-21', entry: { label: 'x' } }]);
@@ -118,7 +118,9 @@ describe('lookupDateFactAt — the zone belongs to the CALENDAR', () => {
     const cal = calendar([{ date: '2026-02-21', entry: { label: 'Shahid Dibosh' } }]);
 
     expect(lookupDateFactAt(cal, new Date('2026-02-21T17:00:00.000Z')).kind).toBe('listed');
-    expect(lookupDateFactAt(cal, new Date('2026-02-21T18:30:00.000Z'))).toEqual({ kind: 'not-listed' });
+    expect(lookupDateFactAt(cal, new Date('2026-02-21T18:30:00.000Z'))).toEqual({
+      kind: 'not-listed',
+    });
   });
 });
 
@@ -258,6 +260,8 @@ describe('defineDateFactCalendar — the timezone is checked, not trusted', () =
   });
 
   it('accepts a well-formed calendar', () => {
-    expect(calendar([{ date: '2026-12-16', entry: { label: 'Victory Day' } }]).timeZone).toBe('Asia/Dhaka');
+    expect(calendar([{ date: '2026-12-16', entry: { label: 'Victory Day' } }]).timeZone).toBe(
+      'Asia/Dhaka',
+    );
   });
 });

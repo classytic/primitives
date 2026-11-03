@@ -12,10 +12,10 @@ import {
   defaultPassOf,
   fromRevenueMonetizationType,
   isBundleMonetization,
-  isOnSale,
   isFreeMonetization,
   isMonetizationKind,
   isOneTimeMonetization,
+  isOnSale,
   isPassMonetization,
   isSubscriptionMonetization,
   isUsageMonetization,
@@ -231,7 +231,9 @@ describe('isOnSale', () => {
     pricing: {
       basePrice: { amount: base, currency: 'BDT' },
       currency: 'BDT',
-      ...(compareAt === undefined ? {} : { compareAtPrice: { amount: compareAt, currency: compareCurrency } }),
+      ...(compareAt === undefined
+        ? {}
+        : { compareAtPrice: { amount: compareAt, currency: compareCurrency } }),
     },
   });
 

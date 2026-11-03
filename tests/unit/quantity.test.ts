@@ -91,8 +91,24 @@ describe('isOnStep / compareQuantity', () => {
 
 describe('isQuantityStep', () => {
   const candidates: unknown[] = [
-    1, 0.05, 0.001, 0.000001, 0.0000001, 0, -1, 0.5, 2.5, 1e-9, Number.NaN, Number.POSITIVE_INFINITY,
-    '1', null, undefined, {}, 0.1 + 0.2, 1e12 + 0.5,
+    1,
+    0.05,
+    0.001,
+    0.000001,
+    0.0000001,
+    0,
+    -1,
+    0.5,
+    2.5,
+    1e-9,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    '1',
+    null,
+    undefined,
+    {},
+    0.1 + 0.2,
+    1e12 + 0.5,
   ];
 
   it('is true exactly when quantityStepToGrid accepts the step', () => {
@@ -108,7 +124,17 @@ describe('isQuantityStep', () => {
   });
 
   it('refuses what is not a usable step and never throws', () => {
-    for (const bad of [0, -1, 0.0000001, Number.NaN, Number.POSITIVE_INFINITY, '1', null, undefined, {}]) {
+    for (const bad of [
+      0,
+      -1,
+      0.0000001,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      '1',
+      null,
+      undefined,
+      {},
+    ]) {
       expect(isQuantityStep(bad)).toBe(false);
     }
     for (const good of [1, 0.05, 0.000001, 2.5]) expect(isQuantityStep(good)).toBe(true);

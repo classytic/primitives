@@ -78,10 +78,14 @@ describe('server-TZ independence (child processes in 4 countries)', () => {
 
     // Honest platform probe: only compare servers whose TZ actually applied.
     const effective = results.filter((r) => r.out['probe'] === r.probe);
-    expect(effective.length, 'at least the UTC server must probe correctly').toBeGreaterThanOrEqual(1);
+    expect(effective.length, 'at least the UTC server must probe correctly').toBeGreaterThanOrEqual(
+      1,
+    );
     if (effective.length < results.length) {
       const skipped = results.filter((r) => r.out['probe'] !== r.probe).map((r) => r.tz);
-      console.warn(`[server-tz] runtime ignored TZ env for: ${skipped.join(', ')} — comparing the rest`);
+      console.warn(
+        `[server-tz] runtime ignored TZ env for: ${skipped.join(', ')} — comparing the rest`,
+      );
     }
 
     const expected = {

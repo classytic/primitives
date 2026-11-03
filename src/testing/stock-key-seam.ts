@@ -15,8 +15,8 @@
  * Node-only (`node:fs`), so it is a `/testing` subpath and never reachable from
  * the isomorphic value-object entries.
  */
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
 export interface StockKeyViolation {
   /** Path relative to the scanned root. */
@@ -53,14 +53,14 @@ export const STOCK_KEY_FROM_LABEL = { test: takesStockKeyFromLabel };
 
 /** Lines that are prose, not code. */
 const isComment = (trimmed: string): boolean =>
-  trimmed.startsWith("*") || trimmed.startsWith("//") || trimmed.startsWith("/*");
+  trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*');
 
 function tsFilesIn(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
-    if (entry === "node_modules" || entry === "dist") continue;
+    if (entry === 'node_modules' || entry === 'dist') continue;
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) tsFilesIn(full, acc);
-    else if (entry.endsWith(".ts") && !entry.endsWith(".d.ts")) acc.push(full);
+    else if (entry.endsWith('.ts') && !entry.endsWith('.d.ts')) acc.push(full);
   }
   return acc;
 }
@@ -77,13 +77,17 @@ export function scanStockKeySeam(srcRoot: string): StockKeySeamScan {
   const violations: StockKeyViolation[] = [];
 
   for (const file of files) {
-    const lines = readFileSync(file, "utf8").split("\n");
+    const lines = readFileSync(file, 'utf8').split('\n');
     for (let i = 0; i < lines.length; i++) {
-      const raw = lines[i] ?? "";
+      const raw = lines[i] ?? '';
       const trimmed = raw.trim();
       if (isComment(trimmed)) continue;
       if (takesStockKeyFromLabel(raw)) {
-        violations.push({ file: relative(srcRoot, file), line: i + 1, text: trimmed.slice(0, 120) });
+        violations.push({
+          file: relative(srcRoot, file),
+          line: i + 1,
+          text: trimmed.slice(0, 120),
+        });
       }
     }
   }
@@ -105,7 +109,7 @@ export function assertStockKeySeam(srcRoot: string, opts: { minFiles: number }):
   }
 
   if (violations.length > 0) {
-    const list = violations.map((v) => `  ${v.file}:${v.line}  ${v.text}`).join("\n");
+    const list = violations.map((v) => `  ${v.file}:${v.line}  ${v.text}`).join('\n');
     throw new Error(
       `A stock key must come from stockKeyOf() (skuRef ?? sku), never from the .sku label:\n${list}`,
     );
@@ -121,17 +125,17 @@ export const STOCK_KEY_SEAM_FIXTURES = {
   mustMatch: [
     "        skuRef: (snapshot.sku as string | undefined) ?? '',",
     "        skuRef: snap?.sku ?? '',",
-    "      const skuRef = line.snapshot?.sku ?? line.offerId;",
-    "        skuRef: (line.snapshot?.sku ?? line.offerId) as string,",
+    '      const skuRef = line.snapshot?.sku ?? line.offerId;',
+    '        skuRef: (line.snapshot?.sku ?? line.offerId) as string,',
   ],
   mustNotMatch: [
     "        skuRef: stockKeyOf(snapshot) ?? '',",
-    "        skuRef: line.skuRef,",
+    '        skuRef: line.skuRef,',
     "        sku: (snapshot.sku as string | undefined) ?? '',",
-    "      const label = variant.sku ?? variant.skuRef;",
+    '      const label = variant.sku ?? variant.skuRef;',
     // The CORRECT hand-rolled fallback. Flagging it is what makes a gate noisy
     // enough to be deleted, so it is a fixture in its own right.
-    "      const skuRef = line.skuRef ?? line.sku;",
-    "        skuRef: item.skuRef ?? item.sku,",
+    '      const skuRef = line.skuRef ?? line.sku;',
+    '        skuRef: item.skuRef ?? item.sku,',
   ],
 } as const;

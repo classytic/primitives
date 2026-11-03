@@ -22,6 +22,12 @@ import type { PaymentMethodKind } from './payment-method-kind.js';
  * cash providers, route 3DS-required cards to verification flows).
  */
 export interface ProviderCapabilities {
+  /** A separate money-moving confirm command is required after customer approval. */
+  supportsConfirmation?: boolean;
+  /** True only when same-key create retries are deduplicated by the provider. */
+  supportsIdempotentCreate?: boolean;
+  /** Deduplication lifetime from command creation; null means no expiry. Absent gives no retry assurance. */
+  idempotentCreateWindowMs?: number | null;
   /** Provider exposes a webhook endpoint the host can register. */
   supportsWebhooks: boolean;
   /** Provider can reverse a captured charge. */
@@ -88,12 +94,20 @@ export type RefundResultStatus =
 
 // ─── Payment intent (creation result) ────────────────────────────────────
 
-/**
- * What `provider.createIntent(...)` returns. The engine persists
- * `id` / `paymentIntentId` / `sessionId` on the Transaction's
- * `gateway` block so subsequent `verify` / webhook lookups can find
- * the row.
- */
+/** Browser-return authorization, never proof that funds were captured. */
+export interface PaymentReturnCommand {
+  provider: string;
+  paymentId: string;
+  token: string;
+  status: 'success' | 'failure' | 'cancel';
+}
+
+/** Minimal public observation; private order access remains a separate credential. */
+export interface PaymentReturnResult {
+  status: 'pending' | 'succeeded' | 'failed' | 'refunded' | 'partially_refunded';
+  requiresReconciliation?: boolean;
+}
+
 /**
  * A PROVIDER-side intent reference — what the gateway calls this payment.
  *
@@ -138,6 +152,12 @@ export interface ProviderIntent {
   /** Canonical method kind if known at intent creation (customer pre-selected). */
   methodKind?: PaymentMethodKind;
 
+  /**
+   * SERVER-ONLY browser-return credential. Never copy into public gateway metadata or DTOs.
+   * Persist a digest bound to this intent before handing its payment URL to a client.
+   */
+  returnProof?: { token: string; validForMs: number };
+
   /** Pass-through metadata echoed from the create call. */
   metadata?: Record<string, unknown>;
   /** Raw provider response — kept for audit. Consumers MUST NOT rely on shape. */
@@ -155,6 +175,10 @@ export interface PaymentResult {
   id: string;
   /** Lowercase gateway name. */
   provider: string;
+  /** True only when a provider read confirms customer authorization for first execution. */
+  confirmationReady?: boolean;
+  /** Merchant reference echoed by the gateway, when available. */
+  merchantReference?: string;
   /**
    * Closed status set — narrower than `ProviderIntent.status` because
    * verification has settled the lifecycle.
@@ -327,6 +351,9 @@ export interface PaymentProviderPort {
    * mandatory is what stops an adapter quietly omitting it.
    */
   createIntent(params: CreateIntentParams, command: PaymentCommandContext): Promise<ProviderIntent>;
+
+  /** Mutating confirmation, claimed durably by the engine before I/O. Never retry blindly. */
+  confirmPayment?(intentId: string, command: PaymentCommandContext): Promise<PaymentResult>;
 
   /**
    * Confirm an intent actually succeeded at the provider.

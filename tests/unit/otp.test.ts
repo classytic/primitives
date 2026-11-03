@@ -72,8 +72,10 @@ describe('verifyOtpChallenge — brute force resistance', () => {
   it('locks the challenge on the maxAttempts-th wrong code', () => {
     let challenge = mint({ maxAttempts: 3 }).challenge;
     for (let i = 0; i < 2; i += 1) {
-      challenge = verifyOtpChallenge(challenge, 'wrong!', { secret: SECRET, now: at(1000) })
-        .challenge;
+      challenge = verifyOtpChallenge(challenge, 'wrong!', {
+        secret: SECRET,
+        now: at(1000),
+      }).challenge;
     }
     const last = verifyOtpChallenge(challenge, 'wrong!', { secret: SECRET, now: at(1000) });
     expect(last.outcome).toBe('locked');
@@ -82,8 +84,10 @@ describe('verifyOtpChallenge — brute force resistance', () => {
 
   it('a locked challenge rejects even the CORRECT code (fail-closed)', () => {
     const { challenge, code } = mint({ maxAttempts: 1 });
-    const locked = verifyOtpChallenge(challenge, 'nope', { secret: SECRET, now: at(1000) })
-      .challenge;
+    const locked = verifyOtpChallenge(challenge, 'nope', {
+      secret: SECRET,
+      now: at(1000),
+    }).challenge;
     expect(locked.status).toBe('failed');
     const retry = verifyOtpChallenge(locked, code, { secret: SECRET, now: at(1000) });
     expect(retry.outcome).toBe('locked');
@@ -109,8 +113,10 @@ describe('verifyOtpChallenge — expiry', () => {
 describe('verifyOtpChallenge — replay / single-use', () => {
   it('a verified challenge cannot be reused', () => {
     const { challenge, code } = mint();
-    const verified = verifyOtpChallenge(challenge, code, { secret: SECRET, now: at(1000) })
-      .challenge;
+    const verified = verifyOtpChallenge(challenge, code, {
+      secret: SECRET,
+      now: at(1000),
+    }).challenge;
     const replay = verifyOtpChallenge(verified, code, { secret: SECRET, now: at(2000) });
     expect(replay.outcome).toBe('already_used');
     expect(replay.challenge.status).toBe('verified');
@@ -149,8 +155,10 @@ describe('isOtpActive', () => {
     const { challenge, code } = mint({ ttlMs: 30_000 });
     expect(isOtpActive(challenge, at(1000))).toBe(true);
     expect(isOtpActive(challenge, at(30_001))).toBe(false);
-    const verified = verifyOtpChallenge(challenge, code, { secret: SECRET, now: at(1000) })
-      .challenge;
+    const verified = verifyOtpChallenge(challenge, code, {
+      secret: SECRET,
+      now: at(1000),
+    }).challenge;
     expect(isOtpActive(verified, at(2000))).toBe(false);
   });
 });

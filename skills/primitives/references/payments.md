@@ -33,7 +33,8 @@ console.log(isPaymentEvent(PAYMENT_EVENT_TYPE.SUCCEEDED, payload), isFundsReceiv
 
 ## /payment-gateway
 Data shapes a provider speaks to a payment engine.
-- `PaymentProviderPort`: `createIntent(params, command)`, `verifyPayment`, `getStatus`, `refund(paymentId, amount, command, options)`, `handleWebhook`, `verifyWebhookSignature`, `getCapabilities()`; optional `getRefundStatus`, `wantsRawBody`.
+- `PaymentProviderPort`: `createIntent(params, command)`, read-only `verifyPayment`/`getStatus`, `refund(paymentId, amount, command, options)`, `handleWebhook`, `verifyWebhookSignature`, `getCapabilities()`; optional mutating `confirmPayment(intentId, command)`, `getRefundStatus`, `wantsRawBody`.
+- `ProviderCapabilities.supportsConfirmation` advertises the separate confirmation command. `supportsIdempotentCreate` is true only for proven same-key upstream deduplication, with `idempotentCreateWindowMs` declaring its lifetime (`null` means no expiry). Missing guarantees/windows do not authorize retries. `PaymentResult.merchantReference` carries the echoed merchant reference for engine correlation.
 - `PaymentCommandContext` requires `idempotencyKey`, `requestId`, `merchantReference`; optional `organizationId`, `signal`.
 - `ProviderCommandResult<T>` is three-valued: `confirmed`, `declined` (with `PaymentDecline`: `reason`, `retryable`), `unknown` (with `ProviderUnknownCause`).
 - Also: `ProviderCapabilities`, `CreateIntentParams`, `ProviderIntent`, `PaymentResult`, `RefundResult`, `WebhookEvent`, `DefaultCurrencyAware`, `RefundStatusQuery`.
@@ -47,3 +48,7 @@ Bank-feed shapes shared by statement parsers and importers: `BankTransaction`, `
 
 ## Cash destination
 `CASH_DESTINATIONS` (`cash`, `petty_cash`), `isCashDestination`, `cashDestinationLabel` come from `/money`. They name where received cash landed as an intent, never as a chart-of-accounts code.
+
+`ProviderIntent.returnProof` is a server-only browser-return credential, separate from public metadata. Revenue persists an intent-bound expiring digest before checkout handoff. Use `PaymentReturnCommand`/`PaymentReturnResult` for the normalized exchange; a return status never proves that money moved.
+
+`PaymentResult.confirmationReady` must come from a provider read that confirms customer approval. Browser-return handlers check it before consuming the first execution claim; a callback status string cannot set it.

@@ -19,7 +19,7 @@
  * Pinned by `tests/unit/item-identity.test.ts`.
  */
 
-import type { Brand } from "../composition/brand.js";
+import type { Brand } from '../composition/brand.js';
 
 /**
  * A resolved STOCK key — the string quants, moves and reservations are keyed by.
@@ -29,7 +29,7 @@ import type { Brand } from "../composition/brand.js";
  * `skuRef ?? sku` rule. A merchandising label passed where a stock key belongs
  * finds no quant and reports "out of stock" against a full shelf.
  */
-export type StockKey = Brand<string, "StockKey">;
+export type StockKey = Brand<string, 'StockKey'>;
 
 /** Identifier fields a record may carry — each shape populates a different subset. */
 export interface SkuFields {
@@ -42,7 +42,7 @@ export interface SkuFields {
 }
 
 const nonEmpty = (value: string | undefined): string | undefined =>
-  typeof value === "string" && value.trim().length > 0 ? value : undefined;
+  typeof value === 'string' && value.trim().length > 0 ? value : undefined;
 
 /**
  * The STOCK key to reserve, decrement and post against: `skuRef ?? sku`,
@@ -77,9 +77,9 @@ export interface StockKeySource {
  * - `variant` one variant record in hand, from iterating `variants`
  */
 export type StockKeySelector =
-  | { readonly kind: "sole" }
-  | { readonly kind: "label"; readonly sku: string }
-  | { readonly kind: "variant"; readonly variant: SkuFields };
+  | { readonly kind: 'sole' }
+  | { readonly kind: 'label'; readonly sku: string }
+  | { readonly kind: 'variant'; readonly variant: SkuFields };
 
 /**
  * THE product-level stock key. One precedence, for every package.
@@ -108,12 +108,12 @@ export function stockKeyFor(product: StockKeySource, selector: StockKeySelector)
   const sole = variants.length <= 1;
 
   switch (selector.kind) {
-    case "sole":
+    case 'sole':
       // The soleness test is REQUIRED: `variants[0]` on a multi-variant product
       // is one sibling's quant, picked by array order.
       if (!sole) return productId as StockKey;
       return (nonEmpty(variants[0]?.skuRef) ?? productId) as StockKey;
-    case "label": {
+    case 'label': {
       const matched = variants.find((v) => v.sku === selector.sku);
       const stamp = nonEmpty(matched?.skuRef);
       if (stamp !== undefined) return stamp as StockKey;
@@ -123,11 +123,11 @@ export function stockKeyFor(product: StockKeySource, selector: StockKeySelector)
       if (sole) return productId as StockKey;
       return selector.sku as StockKey;
     }
-    case "variant": {
+    case 'variant': {
       const stamp = nonEmpty(selector.variant.skuRef);
       if (stamp !== undefined) return stamp as StockKey;
       if (sole) return productId as StockKey;
-      return (stockKeyOf(selector.variant, productId) as StockKey);
+      return stockKeyOf(selector.variant, productId) as StockKey;
     }
   }
 }
@@ -140,7 +140,7 @@ export function requireStockKey(item: SkuFields, context?: string): StockKey {
   const key = stockKeyOf(item);
   if (key === undefined) {
     throw new Error(
-      `stock key missing: neither skuRef nor sku is set${context ? ` (${context})` : ""}`,
+      `stock key missing: neither skuRef nor sku is set${context ? ` (${context})` : ''}`,
     );
   }
   return key;
@@ -183,5 +183,5 @@ export function skuDisplay(item: SkuFields): SkuDisplay {
  * quants by any stable string.
  */
 export function looksLikeOpaqueId(value: string | undefined): boolean {
-  return typeof value === "string" && /^[0-9a-f]{24}$/i.test(value);
+  return typeof value === 'string' && /^[0-9a-f]{24}$/i.test(value);
 }

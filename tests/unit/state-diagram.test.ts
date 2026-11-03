@@ -7,12 +7,12 @@
  * a golden blob, which would only pin formatting.
  */
 import { describe, expect, it } from 'vitest';
-import { defineStateMachine } from '../../src/workflow/state-machine.js';
 import {
   describeStateMachine,
   toMermaid,
   unreachableStates,
 } from '../../src/workflow/state-diagram.js';
+import { defineStateMachine } from '../../src/workflow/state-machine.js';
 
 /** The real device-command lifecycle, including its `sent → sent` re-lease. */
 const COMMANDS = defineStateMachine<

@@ -12,8 +12,8 @@ import {
   dueForAutoResume,
   evaluateSuspension,
   openSpans,
-  suspendedDaysInPeriod,
   type SuspensionSpan,
+  suspendedDaysInPeriod,
 } from '../../src/workflow/suspension.js';
 
 const d = (iso: string) => new Date(iso);
@@ -129,11 +129,9 @@ describe('deciding a request', () => {
   });
 
   it('refuses outright when the product has no freeze', () => {
-    const decision = evaluateSuspension(
-      { startsAt: d('2026-02-01T00:00:00Z') },
-      [],
-      { allowed: false },
-    );
+    const decision = evaluateSuspension({ startsAt: d('2026-02-01T00:00:00Z') }, [], {
+      allowed: false,
+    });
     expect(decision.reason).toBe('not_allowed');
   });
 
@@ -217,9 +215,9 @@ describe('the auto-resume sweep', () => {
   it('does NOT re-derive the end from current policy', () => {
     // A pause with no stored end is left alone. Re-deriving it would move a date
     // the member was already told, using a policy that may have changed since.
-    expect(dueForAutoResume({ startedAt: d('2026-02-01T00:00:00Z') }, d('2027-01-01T00:00:00Z'))).toBe(
-      false,
-    );
+    expect(
+      dueForAutoResume({ startedAt: d('2026-02-01T00:00:00Z') }, d('2027-01-01T00:00:00Z')),
+    ).toBe(false);
   });
 
   it('reports open spans', () => {
@@ -239,9 +237,7 @@ describe('the allowance window includes TODAY', () => {
     // allowance nobody granted. A member 50 days into a 60-day cap must have 10
     // left, not 11.
     const now = d('2026-06-20T18:30:00Z');
-    const history: SuspensionSpan[] = [
-      { startedAt: d('2026-05-01T18:30:00Z'), endedAt: now },
-    ];
+    const history: SuspensionSpan[] = [{ startedAt: d('2026-05-01T18:30:00Z'), endedAt: now }];
     const period = allowancePeriod(now);
     expect(suspendedDaysInPeriod(history, period, now)).toBe(50);
 

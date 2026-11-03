@@ -75,10 +75,13 @@ subpath imports only.
 | `/brand` | `Brand<T, B>`, `Prettify`, `DeepPartial`, `DeepReadonly`, `RequireKeys`, `OptionalKeys`, `Nullable`, `KeysMatching`, `NonEmptyArray` |
 | `/split-allocation` | `allocate`, `isBalanced`, `SplitAllocationError`, `SplitMethod`, `SplitSubject`, `SplitPart`, `SplitResult` |
 | `/idempotency` | `decideClaim`, `completeClaim`, `renewLease`, `identityKey`, `sameIdentity`, `fingerprintRequest`, `newLeaseToken`, `isLeaseExpired`, `holdsLease`, `isInFlight`, `DEFAULT_LEASE_MS`, `IdempotencyClaim`, `ClaimOutcome`, `ClaimResult`, `ClaimState`, `IdempotencyIdentity`, `IdempotencyError` |
-| `/approval` | `createChain`, `applyDecision`, `skipStep`, `nextPendingStep`, `pendingSteps`, `isApproved`, `assertApproved`, `assertApprovedIfPresent`, `isRejected`, `isPending`, `decisionCount`, `ApprovalError`, `ApprovalChain`, `ApprovalStep`, `ApprovalDecision`, `Approver`, `ApprovalThreshold` |
+| `/approval` | `createChain`, `applyDecision`, `skipStep`, `nextPendingStep`, `pendingSteps`, `isApproved`, `assertApproved`, `assertApprovedIfPresent`, `isRejected`, `isPending`, `decisionCount`, `chainToJson`, `ApprovalChainJson`, `ApprovalError`, `ApprovalChain`, `ApprovalStep`, `ApprovalDecision`, `Approver`, `ApprovalThreshold` |
 | `/cadence` | `nextOccurrence`, `occurrencesBetween`, `validateCadence`, `CadenceError`, `Cadence`, `DailyCadence`, `WeeklyCadence`, `MonthlyCadence`, `YearlyCadence`, `CronCadence`, `IsoWeekday` |
 | `/hold` | `addHold`, `resolveHold`, `activeHolds`, `resolvedHolds`, `isOnHold`, `hasActiveHoldOfCode`, `HoldError`, `HoldReason`, `HoldActor` |
 | `/sla` | `breachedAt`, `remainingMs`, `elapsedMs`, `isBreached`, `consumedFraction`, `validateSLA`, `SLAError`, `SLA`, `BreachPolicy` |
+| `/timezone` | civil dates and zones (`civilDateOf`, `civilDateToInstant`, `addCivilDays`, `addCivilMonths`, ...) plus daily wall-clock windows: `WallTime`, `WallWindow`, `parseWallTime`, `wallTimeOf`, `wallInstant`, `resolveWallWindow`, `wallWindowAt`, `wallWindowStartsBetween` (overnight, DST-exact, half-open) |
+| `/identifier` | `cleanIdentifier` (invisible marks removed, NFKC, digits to ASCII, trimmed), `asciiDigits` (every Unicode decimal digit), `stripInvisible` (`\p{Cf}`) for pasted staff numbers, national IDs, e-mail |
+| `/concurrency` | `mapBounded(items, concurrency, fn)` (worker pool, ordered results, fail-fast after in-flight settle; `NaN` concurrency throws), `chunked(items, size)` |
 
 ## Design
 

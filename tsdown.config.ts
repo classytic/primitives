@@ -41,6 +41,7 @@ export default defineConfig({
     'identity-verification': 'src/identity/identity-verification.ts',
     otp: 'src/identity/otp.ts',
     'item-identity': 'src/identity/item-identity.ts',
+    identifier: 'src/identity/identifier.ts',
     'stock-level': 'src/inventory/stock-level.ts',
     'item-stock': 'src/inventory/item-stock.ts',
     quantity: 'src/inventory/quantity.ts',
@@ -90,6 +91,7 @@ export default defineConfig({
     // ─── composition ────────────────────────────────────────────────────
     mixin: 'src/composition/mixin.ts',
     deadline: 'src/composition/deadline.ts',
+    concurrency: 'src/composition/concurrency.ts',
     reference: 'src/composition/reference.ts',
     'fault-attribution': 'src/composition/fault-attribution.ts',
     context: 'src/composition/context.ts',

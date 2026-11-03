@@ -18,21 +18,21 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { BD_ADDRESS_FORMAT } from '../../../bd-areas/src/address-format/index.js';
 import {
-  INTERNATIONAL_ADDRESS_FORMAT,
-  requiredKeys,
+  type Address,
+  type AddressFieldKey,
+  type AddressFormatRegistry,
+  describeAddressError,
   fieldName,
+  INTERNATIONAL_ADDRESS_FORMAT,
+  isAddressValid,
   isExtensionField,
+  requiredKeys,
   resolveAddressFormat,
   supportedCountries,
   validateAddress,
-  isAddressValid,
-  describeAddressError,
-  type AddressFieldKey,
-  type AddressFormatRegistry,
-  type Address,
 } from '../../src/identity/address.js';
-import { BD_ADDRESS_FORMAT } from '../../../bd-areas/src/address-format/index.js';
 
 const REGISTRY: AddressFormatRegistry = { BD: BD_ADDRESS_FORMAT };
 
@@ -110,7 +110,13 @@ describe('the international fallback does not assume a country like ours', () =>
     // perfectly valid addresses — the one thing a fallback must never do.
     expect(
       isAddressValid(
-        { name: 'A Person', phone: '+65 0000 0000', line1: '1 Raffles Place', city: 'Singapore', country: 'SG' },
+        {
+          name: 'A Person',
+          phone: '+65 0000 0000',
+          line1: '1 Raffles Place',
+          city: 'Singapore',
+          country: 'SG',
+        },
         INTERNATIONAL_ADDRESS_FORMAT,
       ),
     ).toBe(true);
@@ -186,7 +192,14 @@ describe('validateAddress', () => {
     // A form marks all its invalid fields at once; returning one at a time
     // makes the customer submit repeatedly to discover them.
     const errors = validateAddress({ country: 'BD' }, BD_ADDRESS_FORMAT);
-    expect(errors.map((e) => e.key).sort()).toEqual(['areaName', 'city', 'line1', 'name', 'phone', 'state']);
+    expect(errors.map((e) => e.key).sort()).toEqual([
+      'areaName',
+      'city',
+      'line1',
+      'name',
+      'phone',
+      'state',
+    ]);
   });
 
   it('treats whitespace as absent', () => {
@@ -216,7 +229,14 @@ describe('validateAddress', () => {
   it('never checks a pattern the format did not declare', () => {
     expect(
       validateAddress(
-        { name: 'A', phone: 'B', line1: 'C', city: 'D', country: 'IE', postalCode: 'anything at all' },
+        {
+          name: 'A',
+          phone: 'B',
+          line1: 'C',
+          city: 'D',
+          country: 'IE',
+          postalCode: 'anything at all',
+        },
         INTERNATIONAL_ADDRESS_FORMAT,
       ),
     ).toEqual([]);

@@ -321,11 +321,17 @@ export interface FiscalYear {
 }
 
 /** Half-open range of the fiscal year starting on the 1st of `startMonth` of `startYear`, local to `timezone`. */
-export function resolveFiscalYear(startYear: number, opts: { startMonth: number; timezone: string }): DateRange {
+export function resolveFiscalYear(
+  startYear: number,
+  opts: { startMonth: number; timezone: string },
+): DateRange {
   const zone = assertZone(opts.timezone);
   const y = assertYear(startYear);
   const m = assertMonth(opts.startMonth);
-  return { start: dayStart(`${y}-${pad2(m)}-01`, zone), end: dayStart(`${y + 1}-${pad2(m)}-01`, zone) };
+  return {
+    start: dayStart(`${y}-${pad2(m)}-01`, zone),
+    end: dayStart(`${y + 1}-${pad2(m)}-01`, zone),
+  };
 }
 
 /**
@@ -333,13 +339,20 @@ export function resolveFiscalYear(startYear: number, opts: { startMonth: number;
  * 1 January (most) — decided on the LOCAL calendar day in `timezone`, so the last evening of June in Dhaka
  * is still the old year.
  */
-export function fiscalYearOf(date: Date, opts: { startMonth: number; timezone: string }): FiscalYear {
+export function fiscalYearOf(
+  date: Date,
+  opts: { startMonth: number; timezone: string },
+): FiscalYear {
   const zone = assertZone(opts.timezone);
   const m = assertMonth(opts.startMonth);
   const [y, mm] = String(civilDateOf(date, zone)).split('-').map(Number) as [number, number];
   const startYear = mm >= m ? y : y - 1;
   const label = m === 1 ? String(startYear) : `${startYear}-${pad2((startYear + 1) % 100)}`;
-  return { startYear, label, range: resolveFiscalYear(startYear, { startMonth: m, timezone: zone }) };
+  return {
+    startYear,
+    label,
+    range: resolveFiscalYear(startYear, { startMonth: m, timezone: zone }),
+  };
 }
 
 /**

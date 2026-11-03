@@ -4,7 +4,14 @@
  * of its own. Country packs decide what follows from a form (equity accounts, the year-end close, tax).
  */
 
-export const LEGAL_FORMS = ['individual', 'partnership', 'company', 'cooperative', 'nonprofit', 'government'] as const;
+export const LEGAL_FORMS = [
+  'individual',
+  'partnership',
+  'company',
+  'cooperative',
+  'nonprofit',
+  'government',
+] as const;
 
 export type LegalForm = (typeof LEGAL_FORMS)[number];
 

@@ -8,7 +8,12 @@
  * a sole variant's key IS the product id, so summing lookups instead of rows doubles it.
  */
 
-import { type SkuFields, type StockKey, type StockKeySource, stockKeyFor } from "../identity/item-identity.js";
+import {
+  type SkuFields,
+  type StockKey,
+  type StockKeySource,
+  stockKeyFor,
+} from '../identity/item-identity.js';
 
 /** One stock row as the summary reads it. */
 export interface StockRow {
@@ -35,7 +40,9 @@ export interface ItemStock {
 
 /** The item shape the summary reads: its id and its variants. */
 export interface StockableItem extends StockKeySource {
-  readonly variants?: ReadonlyArray<SkuFields & { readonly sku: string; readonly isActive?: boolean }> | null;
+  readonly variants?: ReadonlyArray<
+    SkuFields & { readonly sku: string; readonly isActive?: boolean }
+  > | null;
 }
 
 /**
@@ -49,7 +56,8 @@ export function itemStockOf(
 ): ItemStock {
   const itemId = String(item._id);
   const variants = item.variants ?? [];
-  const keyOf = (variant: SkuFields) => stockKeyFor({ _id: itemId, variants }, { kind: "variant", variant });
+  const keyOf = (variant: SkuFields) =>
+    stockKeyFor({ _id: itemId, variants }, { kind: 'variant', variant });
 
   // The DISTINCT rows, by stock key — counting one row twice is unrepresentable here.
   const rows = new Map<string, StockRow | undefined>();
@@ -73,12 +81,14 @@ export function itemStockOf(
     quantity += rowQuantity;
     if (rowQuantity > 0) {
       valueMinor =
-        row?.valueMinor === undefined || valueMinor === undefined ? undefined : valueMinor + row.valueMinor;
+        row?.valueMinor === undefined || valueMinor === undefined
+          ? undefined
+          : valueMinor + row.valueMinor;
     }
   }
 
   // Two variants sharing a stock key each report that row's quantity — that is what sharing means.
-  const variantStocks: NonNullable<ItemStock["variants"]> = [];
+  const variantStocks: NonNullable<ItemStock['variants']> = [];
   for (const variant of variants) {
     if (variant.isActive === false) continue;
     const key = keyOf(variant);

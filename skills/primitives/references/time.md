@@ -7,13 +7,30 @@ Subpaths: `/timezone`, `/period`, `/calendar`, `/calendar-facts`. Rule: a calend
 - `civilDateOf(instant, zone)` -> the local calendar day. `civilDateToInstant(cd, zone, { hour, minute })` -> local midnight by default, DST-exact.
 - `addCivilDays(cd, n)`, `civilDaysBetween(a, b)`, `isoWeekOfCivilDate(cd)` (`2026-W14`).
 - `localTimeParts(instant, zone)` -> `{ isoWeekday, hour, minute, minutesOfDay }`; `zoneOffsetMinutes(instant, zone)`, `zoneOffsetLabel`, `isValidTimeZone(zone)`, `listTimeZones()`.
-- There is no civil-month arithmetic here; write it on top of these helpers.
+- `addCivilMonths(cd, n)` clamps to the target month's last day (Jan 31 + 1 -> Feb 28). Throws `RangeError` on a non-integer `n`.
+- Daily wall-clock windows (`WallWindow { start, end }`, `'HH:mm'`; overnight when `end <= start`, `start === end` is 24 hours):
+  - `resolveWallWindow(date, window, zone)` -> half-open `DateRange`, DST-exact (a 23:00-07:00 window over fall-back is 9 hours).
+  - `wallWindowAt(keyedWindows, instant, zone)` -> `{ key, date, range }` or `null` on a gap; `date` is the day the window STARTED (02:00 belongs to the previous night). Matches by instant, so the repeated DST hour is attributed correctly.
+  - `wallWindowStartsBetween(keyedWindows, from, to, zone)` -> every start in `(from, to]`, sorted: the boundaries a job crossed between ticks. One resolve per window per day: clamp `from` (never the epoch).
+  - `parseWallTime('07:30')` -> 450 (strict, throws `TimeZoneError`), `wallTimeOf(instant, zone)` -> `'HH:mm'`, `wallInstant(date, 'HH:mm', zone)` -> `Date`.
+  - DST: `wallInstant` follows Temporal `'compatible'` in every zone: a repeated time is its earlier occurrence, a skipped time moves forward by the gap (New York 02:30 on spring-forward day = 03:30 EDT). `civilDateToInstant` does NOT guarantee this west of UTC; use `wallInstant` for wall times.
+  - Window boundaries differ in a gap only: they resolve to the jump (New York 02:30 = 03:00 EDT), so a window holds exactly the instants whose clock reads inside it. 02:30-04:00 keeps 03:00-03:30 EDT; a window wholly inside the gap (02:15-02:45) is empty and does not "start"; contiguous calendars stay contiguous.
 
 ```ts
 import { addCivilDays, civilDate, civilDateOf, civilDateToInstant } from "@classytic/primitives/timezone";
 
 const due = addCivilDays(civilDateOf(new Date("2026-03-31T20:00:00Z"), "Asia/Dhaka"), 7);
 console.log(due, civilDateToInstant(civilDate("2026-03-31"), "Asia/Dhaka"));
+```
+
+```ts
+import { wallWindowAt } from "@classytic/primitives/timezone";
+
+const shifts = [
+  { key: "day", start: "07:00", end: "19:00" },
+  { key: "night", start: "19:00", end: "07:00" },
+];
+console.log(wallWindowAt(shifts, new Date("2026-10-30T23:00:00Z"), "Asia/Riyadh")); // night of 2026-10-30
 ```
 
 ## /period

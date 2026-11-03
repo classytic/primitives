@@ -7,9 +7,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Money } from '../../src/money/money.js';
 import {
-  ProrationError,
   allocateMoneyByFraction,
   apportion,
+  ProrationError,
   periodProgress,
   splitByPeriodFraction,
 } from '../../src/money/proration.js';
@@ -84,10 +84,16 @@ describe('splitByPeriodFraction', () => {
 
   it('boundary: nothing elapsed → all remaining; fully elapsed → all consumed', () => {
     const base = { periodStart: d('2026-01-01T00:00:00Z'), periodEnd: d('2026-01-31T00:00:00Z') };
-    const atStart = splitByPeriodFraction(money(5_000), periodProgress({ ...base, asOf: base.periodStart }));
+    const atStart = splitByPeriodFraction(
+      money(5_000),
+      periodProgress({ ...base, asOf: base.periodStart }),
+    );
     expect(atStart.remaining.amount).toBe(5_000);
     expect(atStart.consumed.amount).toBe(0);
-    const atEnd = splitByPeriodFraction(money(5_000), periodProgress({ ...base, asOf: base.periodEnd }));
+    const atEnd = splitByPeriodFraction(
+      money(5_000),
+      periodProgress({ ...base, asOf: base.periodEnd }),
+    );
     expect(atEnd.consumed.amount).toBe(5_000);
     expect(atEnd.remaining.amount).toBe(0);
   });
@@ -114,7 +120,9 @@ describe('apportion', () => {
 
   it('the share and its complement sum to the total exactly', () => {
     for (const part of [1, 333, 33_333, 66_667, 99_999]) {
-      expect(apportion(13_043, part, 100_000) + apportion(13_043, 100_000 - part, 100_000)).toBe(13_043);
+      expect(apportion(13_043, part, 100_000) + apportion(13_043, 100_000 - part, 100_000)).toBe(
+        13_043,
+      );
     }
   });
 

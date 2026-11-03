@@ -458,7 +458,6 @@ function stepMonthly(c: MonthlyCadence, from: Date): Date {
   const anchor = c.startAt;
   // Compute candidate month: at least next month after `from`.
   const year = from.getUTCFullYear();
-  const monthIdx = from.getUTCMonth(); // 0..11
   // Move to the next interval-aligned month after `from`.
   // Align to anchor by stepping interval months at a time until > from.
   // Start from anchor's month/year, step until > from.
@@ -490,9 +489,6 @@ function stepMonthly(c: MonthlyCadence, from: Date): Date {
       return candidate;
     }
   }
-  // Unreachable — loop returns first.
-  // eslint-disable-next-line no-unreachable
-  return new Date(Date.UTC(year, monthIdx, 1));
 }
 
 function stepYearly(c: YearlyCadence, from: Date): Date {

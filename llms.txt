@@ -15,13 +15,14 @@ Money
 /payment-events: payment payloads (isPaymentEvent, isFundsReceived)
 
 Time
-/timezone: day in a zone (civilDateOf, addCivilDays)
+/timezone: day in a zone, shifts (civilDateOf, wallWindowAt)
 /period: month, quarter, fiscal ranges (resolveMonth, resolvePeriod)
 /calendar: fixed-offset day helpers (startOfDay, addMonths)
 /calendar-facts: holiday tables (defineDateEdition, lookupDateFact)
 /cadence: recurrence (nextOccurrence)
 /sla, /sla-policy: targets (breachedAt, evaluateSLAStatus)
 /deadline: promise timeout (withDeadline)
+/concurrency: batches (mapBounded)
 /shelf-life: expiry dates (deriveShelfLifeDates)
 /suspension: pause rules (evaluateSuspension)
 
@@ -49,6 +50,7 @@ People
 /subject: polymorphic ref (makeSubjectRef)
 /legal-form: LEGAL_FORMS
 /address: geo, formats (distanceMeters, validateAddress)
+/identifier: pasted IDs (cleanIdentifier)
 
 Stock
 /quantity: decimal grid (addQuantity, snapQuantity)
@@ -69,7 +71,7 @@ Base
 /fault-attribution: attributeFault
 /signed-token: signToken, verifyToken
 /canonical: canonicalDigest
-/csv: escapeCsvCell
+/csv: escapeCsvCell, csvRecord, csvLines (lazy whole-table CSV)
 /retention: createPurgeEvidence
 
 Not here: pagination, tenant, errors (@classytic/repo-core).

@@ -1,4 +1,4 @@
-import type { Brand } from "../composition/brand.js";
+import type { Brand } from '../composition/brand.js';
 
 /**
  * Stock quantities as NOMINAL types, so "how many are there" and "how many may
@@ -17,10 +17,10 @@ import type { Brand } from "../composition/brand.js";
  */
 
 /** Units physically present. INCLUDES units promised to open carts. */
-export type OnHand = Brand<number, "OnHand">;
+export type OnHand = Brand<number, 'OnHand'>;
 
 /** Units held against an owner (cart, order, move group) — present, not free. */
-export type Reserved = Brand<number, "Reserved">;
+export type Reserved = Brand<number, 'Reserved'>;
 
 /**
  * Units that may still be promised to a NEW buyer: `onHand - reserved`.
@@ -28,7 +28,7 @@ export type Reserved = Brand<number, "Reserved">;
  * Constructible only via {@link sellable}, which is what makes passing on-hand
  * where sellable is required a type error rather than an oversell.
  */
-export type Sellable = Brand<number, "Sellable">;
+export type Sellable = Brand<number, 'Sellable'>;
 
 /** What a location holds, as the ledger records it. */
 export interface StockLevel {

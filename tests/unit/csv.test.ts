@@ -22,18 +22,12 @@ describe('neutralizeCsvFormula', () => {
   });
 
   describe('leaves real numbers alone — a prefixed number breaks SUM', () => {
-    it.each([
-      '-1500',
-      '-1500.75',
-      '+42',
-      '0',
-      '1e6',
-      '-1.5e-3',
-      '.5',
-      '-.5',
-    ])('%s is unchanged', (input) => {
-      expect(neutralizeCsvFormula(input)).toBe(input);
-    });
+    it.each(['-1500', '-1500.75', '+42', '0', '1e6', '-1.5e-3', '.5', '-.5'])(
+      '%s is unchanged',
+      (input) => {
+        expect(neutralizeCsvFormula(input)).toBe(input);
+      },
+    );
 
     it('accepts a negative JS number, not just its string', () => {
       expect(neutralizeCsvFormula(-1500.75)).toBe('-1500.75');

@@ -131,7 +131,7 @@ describe('validateCondition', () => {
   });
 
   it('rejects unknown comparator (INVALID_OP)', () => {
-    expect(() => validateCondition({ field: 'x', op: 'matches' as any, value: 1 })).toThrow(
+    expect(() => validateCondition({ field: 'x', op: 'matches' as never, value: 1 })).toThrow(
       ConditionError,
     );
   });
@@ -153,12 +153,12 @@ describe('validateCondition', () => {
   it('recursively validates inside composites', () => {
     expect(() =>
       validateCondition({
-        all: [{ field: 'x', op: 'badop' as any, value: 1 }],
+        all: [{ field: 'x', op: 'badop' as never, value: 1 }],
       }),
     ).toThrow(ConditionError);
   });
 
   it('rejects null / non-object input', () => {
-    expect(() => validateCondition(null as any)).toThrow(/null or not an object/);
+    expect(() => validateCondition(null as never)).toThrow(/null or not an object/);
   });
 });

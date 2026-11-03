@@ -13,10 +13,10 @@
  * for every field is what makes a warehouse show a marketing name in a unit it
  * does not count in.
  */
-import type { ShelfLifePolicy } from "../scheduling/shelf-life.js";
+import type { ShelfLifePolicy } from '../scheduling/shelf-life.js';
 
 /** Coarse lot/serial tracking. `trackingPolicy.mode` wins when both are set. */
-export type TrackingMode = "none" | "lot" | "serial";
+export type TrackingMode = 'none' | 'lot' | 'serial';
 
 /** The stock facts an Item contributes. Persistence and classification are the owning package's. */
 export interface ItemStockSource {
@@ -87,7 +87,7 @@ export interface ItemStockFacts {
 }
 
 /** Unit assumed when neither side declares one. A deployment-wide guess, and a bad one — set a real `uom` on the Item. */
-const FALLBACK_UOM = "unit";
+const FALLBACK_UOM = 'unit';
 
 const defined = <T>(key: string, value: T | undefined): Record<string, T> =>
   value === undefined ? {} : ({ [key]: value } as Record<string, T>);
@@ -126,15 +126,15 @@ export function resolveStockFacts(input: {
       sku: p.sku,
       displayName: p.displayName,
       uom: p.uom ?? FALLBACK_UOM,
-      ...defined("uomGroupRef", p.uomGroupRef),
+      ...defined('uomGroupRef', p.uomGroupRef),
       ...(p.unitOfMeasureDeclared === true ? { unitOfMeasureDeclared: true } : {}),
-      trackingMode: p.trackingMode ?? "none",
-      ...defined("trackingPolicy", p.trackingPolicy),
-      ...defined("catchWeight", p.catchWeight),
-      ...defined("weightUom", p.weightUom),
-      ...defined("weight", p.weight),
-      ...defined("volume", p.volume),
-      ...defined("barcode", p.barcode),
+      trackingMode: p.trackingMode ?? 'none',
+      ...defined('trackingPolicy', p.trackingPolicy),
+      ...defined('catchWeight', p.catchWeight),
+      ...defined('weightUom', p.weightUom),
+      ...defined('weight', p.weight),
+      ...defined('volume', p.volume),
+      ...defined('barcode', p.barcode),
       isActive: p.isActive ?? true,
     };
   }
@@ -144,15 +144,17 @@ export function resolveStockFacts(input: {
     sku: product?.sku ?? item.sku,
     displayName: product?.displayName ?? item.displayName,
     uom: item.uom,
-    ...defined("uomGroupRef", item.uomGroupRef),
-    ...(item.uomGroupRef === undefined && declaresGroup(product) ? { unitOfMeasureDeclared: true } : {}),
+    ...defined('uomGroupRef', item.uomGroupRef),
+    ...(item.uomGroupRef === undefined && declaresGroup(product)
+      ? { unitOfMeasureDeclared: true }
+      : {}),
     trackingMode: item.trackingMode,
-    ...defined("trackingPolicy", item.trackingPolicy),
-    ...defined("catchWeight", item.catchWeight),
-    ...defined("weightUom", item.weightUom),
-    ...defined("weight", item.weight),
-    ...defined("volume", item.volume),
-    ...defined("barcode", item.barcode),
+    ...defined('trackingPolicy', item.trackingPolicy),
+    ...defined('catchWeight', item.catchWeight),
+    ...defined('weightUom', item.weightUom),
+    ...defined('weight', item.weight),
+    ...defined('volume', item.volume),
+    ...defined('barcode', item.barcode),
     isActive: item.isActive,
   };
 }

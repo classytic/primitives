@@ -131,9 +131,12 @@ describe('placeholder phone', () => {
     expect(isPlaceholderPhone(`  ${p} `)).toBe(true);
   });
 
-  it.each([['+8801711111111'], ['01711111111'], [''], [null], [undefined], [42]])('%j is not a placeholder', (v) => {
-    expect(isPlaceholderPhone(v)).toBe(false);
-  });
+  it.each([['+8801711111111'], ['01711111111'], [''], [null], [undefined], [42]])(
+    '%j is not a placeholder',
+    (v) => {
+      expect(isPlaceholderPhone(v)).toBe(false);
+    },
+  );
 
   it('shownPhone keeps a real number and drops empty or placeholder values', () => {
     expect(shownPhone(' 01711111111 ')).toBe('01711111111');

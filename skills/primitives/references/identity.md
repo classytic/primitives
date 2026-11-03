@@ -1,6 +1,6 @@
 # People and identity: person, phone, OTP, verification, subject
 
-Subpaths: `/person`, `/person-parse`, `/phone`, `/otp`, `/identity-verification`, `/subject`, `/legal-form`. Addresses are in `references/address.md`.
+Subpaths: `/person`, `/person-parse`, `/phone`, `/otp`, `/identity-verification`, `/subject`, `/legal-form`, `/identifier`. Addresses are in `references/address.md`.
 
 ## /person
 - `PersonName` is `{ given, family, middle?, prefix?, suffix?, preferred? }`. `formatFullName(name)` joins the parts; `formatDisplayName(name)` prefers `preferred`, else given and family.
@@ -73,3 +73,17 @@ console.log(ref, ref && formatSubjectRef(ref), makeSubjectRef("user", null));
 
 ## /legal-form
 `LEGAL_FORMS` (`individual`, `partnership`, `company`, `cooperative`, `nonprofit`, `government`), `LEGAL_FORM_LABELS`, `isLegalForm(v)`.
+
+## /identifier
+Identifiers typed or pasted by people (staff numbers, national IDs, codes, e-mail). Not for prose: it drops ZWJ / ZWNJ.
+- `cleanIdentifier(v)`: invisible format marks removed, then NFKC (fullwidth, NBSP), digits to ASCII, trimmed. Idempotent. Keeps case and inner spaces; wrap it per kind.
+- `asciiDigits(v)`: every Unicode decimal digit (Arabic-Indic, Persian, Bengali, Devanagari, Thai, ...) to ASCII. `stripInvisible(v)`: removes `\p{Cf}` (bidi marks, zero-width, soft hyphen, BOM).
+- All three throw `TypeError` on a non-string.
+
+```ts
+import { cleanIdentifier } from "@classytic/primitives/identifier";
+
+const staffNumber = (v: string) => cleanIdentifier(v).toUpperCase();
+const nationalId = (v: string) => cleanIdentifier(v).replace(/\s+/g, "");
+console.log(staffNumber("e\u0662\u0660\u0660\u200F"), nationalId("\u0661\u0662 34")); // "E200", "1234"
+```
