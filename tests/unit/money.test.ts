@@ -64,8 +64,8 @@ describe('fromMajor — float → integer minor units', () => {
     expect(fromMajor(0.1 + 0.2, 'USD')).toEqual({ amount: 30, currency: 'USD' });
   });
 
-  it('defaults unknown currencies to 2 decimals', () => {
-    expect(fromMajor(12.34, 'XYZ')).toEqual({ amount: 1234, currency: 'XYZ' });
+  it('throws for a well-formed but unknown currency', () => {
+    expect(() => fromMajor(12.34, 'XYZ')).toThrow(/unknown currency/i);
   });
 
   it('rejects non-finite input', () => {
@@ -225,45 +225,45 @@ describe('isMoney type guard', () => {
 // assertions against fromMajor document the intentional divergence.
 
 describe('majorToMinorUnits — scalar major→minor', () => {
-  it('converts with default 2 decimals', () => {
-    expect(majorToMinorUnits(10.5)).toBe(1050);
-    expect(majorToMinorUnits(0)).toBe(0);
-    expect(majorToMinorUnits(100)).toBe(10000);
-    expect(majorToMinorUnits(0.01)).toBe(1);
-    expect(majorToMinorUnits(99.99)).toBe(9999);
-    expect(majorToMinorUnits(-5.25)).toBe(-525);
+  it('converts a two-decimal currency', () => {
+    expect(majorToMinorUnits(10.5, 'USD')).toBe(1050);
+    expect(majorToMinorUnits(0, 'USD')).toBe(0);
+    expect(majorToMinorUnits(100, 'USD')).toBe(10000);
+    expect(majorToMinorUnits(0.01, 'USD')).toBe(1);
+    expect(majorToMinorUnits(99.99, 'USD')).toBe(9999);
+    expect(majorToMinorUnits(-5.25, 'USD')).toBe(-525);
   });
 
-  it('supports 0- and 3-decimal exponents', () => {
-    expect(majorToMinorUnits(1000, 0)).toBe(1000);
-    expect(majorToMinorUnits(1.234, 3)).toBe(1234);
+  it('reads 0- and 3-decimal exponents from the currency', () => {
+    expect(majorToMinorUnits(1000, 'JPY')).toBe(1000);
+    expect(majorToMinorUnits(1.234, 'KWD')).toBe(1234);
   });
 
   it('keeps raw IEEE Math.round semantics (ledger characterization)', () => {
     // 1.005 * 100 === 100.4999… in IEEE 754 → 100 (fromMajor cleans to 101)
-    expect(majorToMinorUnits(1.005)).toBe(100);
+    expect(majorToMinorUnits(1.005, 'USD')).toBe(100);
     expect(fromMajor(1.005, 'USD').amount).toBe(101);
     // float-trap sum still lands correctly
-    expect(majorToMinorUnits(0.1 + 0.2)).toBe(30);
+    expect(majorToMinorUnits(0.1 + 0.2, 'USD')).toBe(30);
     // Math.round is half-up toward +∞ — exact negative halves round UP
     // (-0.125 is exactly representable; ×100 = -12.5 exactly)
-    expect(majorToMinorUnits(-0.125)).toBe(-12);
+    expect(majorToMinorUnits(-0.125, 'USD')).toBe(-12);
     expect(fromMajor(-0.125, 'USD').amount).toBe(-13);
   });
 
   it('throws RangeError beyond the safe-integer range and on non-finite input', () => {
-    expect(() => majorToMinorUnits(90_071_992_547_410)).toThrow('exceeds safe integer');
-    expect(() => majorToMinorUnits(Number.NaN)).toThrow(RangeError);
-    expect(() => majorToMinorUnits(Number.POSITIVE_INFINITY)).toThrow(RangeError);
+    expect(() => majorToMinorUnits(90_071_992_547_410, 'USD')).toThrow('exceeds safe integer');
+    expect(() => majorToMinorUnits(Number.NaN, 'USD')).toThrow(RangeError);
+    expect(() => majorToMinorUnits(Number.POSITIVE_INFINITY, 'USD')).toThrow(RangeError);
   });
 });
 
 describe('minorUnitsToMajor — scalar minor→major', () => {
-  it('divides by the exponent factor', () => {
-    expect(minorUnitsToMajor(1050)).toBe(10.5);
-    expect(minorUnitsToMajor(0)).toBe(0);
-    expect(minorUnitsToMajor(1)).toBe(0.01);
-    expect(minorUnitsToMajor(1000, 0)).toBe(1000);
+  it('divides by the currency exponent factor', () => {
+    expect(minorUnitsToMajor(1050, 'USD')).toBe(10.5);
+    expect(minorUnitsToMajor(0, 'USD')).toBe(0);
+    expect(minorUnitsToMajor(1, 'USD')).toBe(0.01);
+    expect(minorUnitsToMajor(1000, 'JPY')).toBe(1000);
   });
 });
 
@@ -292,16 +292,16 @@ describe('percentOfMinor — exact multiply-then-round', () => {
 });
 
 describe('formatMinorUnits — plain decimal string', () => {
-  it('formats with default 2 decimals', () => {
-    expect(formatMinorUnits(10550)).toBe('105.50');
-    expect(formatMinorUnits(0)).toBe('0.00');
-    expect(formatMinorUnits(1)).toBe('0.01');
-    expect(formatMinorUnits(-5050)).toBe('-50.50');
-    expect(formatMinorUnits(1234567890)).toBe('12345678.90');
+  it('formats a two-decimal currency', () => {
+    expect(formatMinorUnits(10550, 'USD')).toBe('105.50');
+    expect(formatMinorUnits(0, 'USD')).toBe('0.00');
+    expect(formatMinorUnits(1, 'USD')).toBe('0.01');
+    expect(formatMinorUnits(-5050, 'USD')).toBe('-50.50');
+    expect(formatMinorUnits(1234567890, 'USD')).toBe('12345678.90');
   });
 
-  it('respects the exponent', () => {
-    expect(formatMinorUnits(1000, 0)).toBe('1000');
-    expect(formatMinorUnits(1234, 3)).toBe('1.234');
+  it('respects the currency exponent', () => {
+    expect(formatMinorUnits(1000, 'JPY')).toBe('1000');
+    expect(formatMinorUnits(1234, 'KWD')).toBe('1.234');
   });
 });

@@ -68,9 +68,9 @@ describe('minorUnitFactor', () => {
     expect(minorUnitFactor('TND')).toBe(1000);
   });
 
-  it('falls back to 100 for unknown codes', () => {
-    expect(minorUnitFactor('XYZ')).toBe(100);
-    expect(minorUnitFactor('')).toBe(100);
+  it('throws for unknown codes instead of assuming 100', () => {
+    expect(() => minorUnitFactor('XYZ')).toThrow(/unknown currency/i);
+    expect(() => minorUnitFactor('')).toThrow(/unknown currency/i);
   });
 });
 

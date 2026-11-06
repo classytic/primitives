@@ -112,14 +112,14 @@ describe('currency: no zero-/three-/four-decimal currency silently gets 2 decima
     expect(fromMajor(10, 'LYD').amount).toBe(10_000);
   });
 
-  it('an ordinary two-decimal currency still defaults correctly', () => {
+  it('an ordinary two-decimal currency resolves from the table', () => {
     expect(minorUnitFactor('BDT')).toBe(100);
     expect(minorUnitFactor('SEK')).toBe(100);
   });
 
-  it('isKnownCurrency distinguishes "listed" from "assumed"', () => {
+  it('isKnownCurrency distinguishes listed from unknown', () => {
     expect(isKnownCurrency('JPY')).toBe(true);
-    expect(isKnownCurrency('jpy')).toBe(false); // lowercase would silently get 100
+    expect(isKnownCurrency('jpy')).toBe(false);
     expect(isKnownCurrency('ZZZ')).toBe(false);
   });
 });

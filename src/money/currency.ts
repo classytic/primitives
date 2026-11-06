@@ -42,22 +42,31 @@ export const CURRENCIES = {
 } as const satisfies Record<string, string>;
 
 /**
- * Number of minor units per major unit, by ISO 4217 code.
+ * Every active ISO 4217 code whose exponent is 2 and that the common set in
+ * {@link MINOR_UNIT_FACTOR} does not already spell out. Listed so that
+ * {@link currencyExponent} can REFUSE a code the table lacks instead of assuming two decimals.
+ */
+const OTHER_TWO_DECIMAL_CODES: readonly string[] = [
+  'AFN ALL AMD ANG AOA ARS AWG AZN BAM BBD BGN BMD BND BOB BOV BRL BSD BTN',
+  'BWP BYN BZD CDF CHE CHW COP COU CRC CUP CVE CZK DKK DOP DZD EGP ERN ETB',
+  'FJD FKP GEL GHS GIP GMD GTQ GYD HNL HTG HUF ILS IRR JMD KES KGS KHR KPW',
+  'KYD KZT LAK LBP LRD LSL MAD MDL MGA MKD MMK MNT MOP MRU MUR MVR MWK MXN',
+  'MXV MZN NAD NGN NIO NOK NZD PAB PEN PGK PHP PLN QAR RON RSD RUB SBD SCR',
+  'SDG SEK SHP SLE SOS SRD SSP STN SVC SYP SZL TJS TMT TOP TRY TTD TWD TZS',
+  'UAH USN UYU UZS VED VES WST XCD XCG YER ZAR ZMW ZWG',
+]
+  .join(' ')
+  .split(' ');
+
+/**
+ * Number of minor units per major unit, by ISO 4217 code — every active code.
  *
- * **This table must list EVERY currency whose exponent is not 2.** ISO 4217
- * defaults to 2 decimals, and {@link minorUnitFactor} falls back to 100 for a
- * code it does not know — which is correct for the ~150 two-decimal currencies
- * and catastrophically wrong for the others. A missing zero-decimal entry does
- * not throw: it makes `fromMajor(1500, 'GNF')` store 150 000 minor units, a
- * 100× error that reads as a plausible number all the way to the gateway.
- *
- * So the exceptions are enumerated EXHAUSTIVELY (all 0-, 3- and 4-decimal
- * codes), leaving the `?? 100` fallback reachable only by a code that is not a
- * real ISO 4217 currency — a typo, a lowercased code, or a placeholder. The
- * two-decimal entries below are redundant with the default and kept only as
- * documentation of the common set.
+ * This is the ONE minor-unit table: {@link minorUnitFactor} and
+ * {@link currencyExponent} read it and throw for a code it lacks. Add new ISO
+ * codes here, never at a consumer.
  */
 export const MINOR_UNIT_FACTOR: Readonly<Record<string, number>> = {
+  ...Object.fromEntries(OTHER_TWO_DECIMAL_CODES.map((code) => [code, 100])),
   USD: 100,
   EUR: 100,
   GBP: 100,
@@ -132,9 +141,8 @@ export function toCurrencyCode(value: string): CurrencyCode | null {
  * {@link toCurrencyCode} that `civilDate` has to `isCivilDate`.
  *
  * `Money` carries a {@link CurrencyCode}, not a bare string, and this is where
- * an untrusted value earns the brand. Rejecting `'jpy'` here matters: lowercase
- * misses {@link MINOR_UNIT_FACTOR}, so it silently becomes a 2-decimal currency
- * and every JPY amount is off by 100×.
+ * an untrusted value earns the brand. Format only: a well-formed code that is not
+ * ISO 4217 passes here and throws at {@link minorUnitFactor}.
  */
 export function currencyCode(value: string): CurrencyCode {
   const code = toCurrencyCode(value);
@@ -149,10 +157,7 @@ export class InvalidCurrencyCodeError extends Error {
   readonly value: string;
 
   constructor(value: string) {
-    super(
-      `Invalid ISO 4217 currency code '${value}' — expected three uppercase letters. ` +
-        'A code that misses the minor-unit table is assumed to have two decimals, which is a 100× error for JPY-style currencies.',
-    );
+    super(`Invalid ISO 4217 currency code '${value}' — expected three uppercase letters.`);
     this.value = value;
   }
 }
@@ -185,28 +190,47 @@ export function isCurrencyCode(value: unknown): value is CurrencyCode {
 
 /**
  * Minor units per major unit (100 for USD, 1 for JPY, 1000 for KWD, 10 000 for CLF).
- *
- * Falls back to 100 for an unlisted code — the ISO 4217 default exponent. Because
- * {@link MINOR_UNIT_FACTOR} enumerates every non-2-decimal currency, that fallback
- * is now only reached by codes that are not ISO 4217 currencies at all; use
- * {@link isKnownCurrency} at a config/boot boundary if you need to reject those
- * rather than assume two decimals for them.
+ * Throws {@link UnknownCurrencyError} for a code {@link MINOR_UNIT_FACTOR} does not
+ * list — the table holds every ISO 4217 currency, so an unlisted code is a mistake.
  */
 export function minorUnitFactor(currency: string): number {
-  return MINOR_UNIT_FACTOR[currency] ?? 100;
+  const factor =
+    typeof currency === 'string' && Object.hasOwn(MINOR_UNIT_FACTOR, currency)
+      ? MINOR_UNIT_FACTOR[currency]
+      : undefined;
+  if (factor === undefined) throw new UnknownCurrencyError(currency);
+  return factor;
 }
 
 /**
- * Does {@link MINOR_UNIT_FACTOR} carry an explicit exponent for this code?
- *
- * `false` means {@link minorUnitFactor} would ASSUME two decimals. That
- * assumption is right for an ordinary ISO 4217 code and wrong by 100× for a
- * mistyped or lowercased one (`'jpy'`), so a boot-time config validator that
- * accepts an operator-supplied currency should gate on this instead of letting
- * the default answer for it.
+ * Does {@link MINOR_UNIT_FACTOR} list this code? `false` means
+ * {@link minorUnitFactor} would throw — gate an operator-supplied currency on it
+ * at a config/boot boundary.
  */
 export function isKnownCurrency(currency: string): boolean {
   return Object.hasOwn(MINOR_UNIT_FACTOR, currency);
+}
+
+/** A currency code {@link MINOR_UNIT_FACTOR} does not list, so its exponent is unknown. */
+export class UnknownCurrencyError extends Error {
+  override readonly name = 'UnknownCurrencyError';
+  readonly value: unknown;
+
+  constructor(value: unknown) {
+    super(
+      `Unknown currency '${String(value)}' — not an ISO 4217 code in MINOR_UNIT_FACTOR, so its minor-unit exponent is unknown.`,
+    );
+    this.value = value;
+  }
+}
+
+/**
+ * The ISO 4217 minor-unit exponent: 2 for USD/BDT, 0 for JPY, 3 for KWD, 4 for CLF.
+ * Throws {@link UnknownCurrencyError} for an unlisted code — it never assumes 2.
+ */
+export function currencyExponent(currency: string): number {
+  // Every factor is a power of ten, so its digit count minus one is the exponent, exactly.
+  return String(minorUnitFactor(currency)).length - 1;
 }
 
 /**

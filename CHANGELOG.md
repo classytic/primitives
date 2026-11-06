@@ -3,6 +3,27 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.37.0 — 2026-11-06
+
+### ⚠ Changed — `minorUnitFactor` throws `UnknownCurrencyError` for an unlisted code
+
+`MINOR_UNIT_FACTOR` lists every ISO 4217 code, so the `?? 100` fallback was reachable only by a mistake (`'XYZ'`, a placeholder) and silently priced it as two-decimal. It now throws, and so do `fromMajor`, `toMajor`, `convertWithSnapshot` and `reverseWithSnapshot` for such a code. `fromMajor` still reports a MALFORMED code (`'usd'`, `''`) as `InvalidCurrencyCodeError`. `money()` stays format-only. Migration: pass a real ISO code; gate operator input with `isKnownCurrency`.
+
+### ⚠ Changed — the scalar minor-unit helpers take the CURRENCY; no default exponent
+
+- `majorToMinorUnits(major, currency)`, `minorUnitsToMajor(minor, currency)`, `formatMinorUnits(minor, currency)`. The second argument was an optional decimal count defaulting to 2, so a call that forgot it was silently 100× wrong for JPY and 10× for KWD. The currency is now required (a call without it does not compile), its exponent is read from `MINOR_UNIT_FACTOR`, and an unknown code throws `UnknownCurrencyError`.
+- Migration: `majorToMinorUnits(x)` → `majorToMinorUnits(x, currency)`; `majorToMinorUnits(x, 0)` → `majorToMinorUnits(x, 'JPY')` (pass the real currency). Rounding is unchanged (raw IEEE `Math.round`).
+
+### Added — `currencyExponent(code)` and `UnknownCurrencyError` (`./currency`)
+
+- The ISO 4217 exponent (JPY 0, BDT/USD 2, KWD 3, CLF 4), derived from `MINOR_UNIT_FACTOR`; throws for an unlisted code instead of assuming 2. Use it in place of `Math.round(Math.log10(minorUnitFactor(c)))`.
+- `MINOR_UNIT_FACTOR` now lists every active ISO 4217 code (it listed only the common two-decimal set plus every non-2 exponent), so `isKnownCurrency('SEK')` is `true`. `minorUnitFactor` throws for an unlisted code (see above).
+
+
+### Added — `./period-snapshot`
+
+`SnapshotKey`, `SnapshotAmounts`, `SnapshotRow`, `SnapshotState` (a balance materialised at a period lock) and `BalancePlan` (how a balance-as-of read was answered: `snapshot+tail` or `scan`, with the watermark, tail start, entries read and the reason). `runSnapshotReaderConformance` compares a reader with a full-scan oracle at every given instant and throws when fewer than `minSnapshotReads` reads took the snapshot path, so an always-scanning reader cannot pass. Type-only otherwise; no dependency.
+
 ## 0.36.0 — 2026-11-03
 
 ### Changed — dev toolchain

@@ -66,6 +66,7 @@ export default defineConfig({
     sla: 'src/scheduling/sla.ts',
     'sla-policy': 'src/scheduling/sla-policy.ts',
     'shelf-life': 'src/scheduling/shelf-life.ts',
+    'period-snapshot': 'src/scheduling/period-snapshot.ts',
 
     // ─── workflow ───────────────────────────────────────────────────────
     'state-machine': 'src/workflow/state-machine.ts',

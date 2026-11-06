@@ -7,7 +7,7 @@ Subpaths: `/money`, `/currency`, `/split-allocation`, `/unit-cost-rate`, `/prora
 - Arithmetic: `addMoney`, `subtractMoney`, `multiplyMoney(m, scalar)` (rounds), `sumMoney(values, currency)` (empty list is zero), `negateMoney`, `absMoney`.
 - Compare: `equalsMoney`, `compareMoney` (-1, 0, 1), `isZeroMoney`, `isPositiveMoney`, `isNegativeMoney`, `isMoney` (guard).
 - Mixed currencies throw `CurrencyMismatchError` (also exported from `/currency`).
-- `percentOfMinor(minor, ratePercent)` returns a rounded integer. `majorToMinorUnits`, `minorUnitsToMajor`, `formatMinorUnits` take decimals (default 2).
+- `percentOfMinor(minor, ratePercent)` returns a rounded integer. `majorToMinorUnits(major, currency)`, `minorUnitsToMajor(minor, currency)`, `formatMinorUnits(minor, currency)` read the exponent from the currency (`currencyExponent`, `/currency`); an unknown code throws `UnknownCurrencyError`. There is no default exponent.
 - `MinorUnits<'BDT'>` is a branded number for wire fields; `Money` is for in-process math.
 - `CASH_DESTINATIONS` (`cash`, `petty_cash`), `isCashDestination`, `cashDestinationLabel` ship from `/money`.
 
@@ -19,7 +19,7 @@ console.log(total, toMajor(total), sumMoney([], "USD"));
 ```
 
 ## /currency
-- `CURRENCIES`, `MINOR_UNIT_FACTOR` (JPY 1, USD 100, KWD 1000), `minorUnitFactor(code)`, `isKnownCurrency`.
+- `CURRENCIES`, `MINOR_UNIT_FACTOR` (every ISO 4217 code: JPY 1, USD 100, KWD 1000), `currencyExponent(code)` (throws `UnknownCurrencyError`), `minorUnitFactor(code)` (falls back to 100), `isKnownCurrency`.
 - `toCurrencyCode(s)` returns the branded code or `null`; `currencyCode(s)` throws `InvalidCurrencyCodeError`; `isCurrencyCode` guards.
 - FX: `convertWithSnapshot(money, fx, { rounding })` is exact (BigInt); `reverseWithSnapshot(base, fx)`; `isFxSnapshot`. Rounding: `half-away-from-zero` (default), `floor`, `ceil`.
 

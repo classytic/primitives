@@ -2,6 +2,7 @@ import type { CurrencyCode } from './currency.js';
 import {
   CurrencyMismatchError,
   currencyCode,
+  currencyExponent,
   isCurrencyCode,
   minorUnitFactor,
 } from './currency.js';
@@ -77,8 +78,7 @@ export function MinorUnits<C extends string = string>(
  * TO `string` — so the brand was decoration on the one type in the package
  * where it matters, and `money()` validated nothing. Any string reached the
  * field: `'jpy'`, `''`, `'US Dollar'`, a mistyped `'BTD'`. None of those are in
- * {@link MINOR_UNIT_FACTOR}, so `minorUnitFactor` assumes two decimals for them
- * and every JPY-style amount is 100× wrong while looking perfectly ordinary.
+ * {@link MINOR_UNIT_FACTOR}; `minorUnitFactor` now throws for them.
  *
  * Construct through {@link money} / {@link fromMajor} (which validate and
  * brand) or through `currencyCode()` at your own boundary. A raw object literal
@@ -127,14 +127,15 @@ export function fromMajor(major: number, currency: string): Money {
   if (!Number.isFinite(major)) {
     throw new TypeError(`fromMajor received non-finite value: ${major}`);
   }
-  const factor = minorUnitFactor(currency);
-  const raw = major * factor;
+  // Format first, so a malformed code reports as malformed rather than as unknown.
+  const code = currencyCode(currency);
+  const raw = major * minorUnitFactor(code);
   // Strip IEEE trailing-bit noise — `Number(n.toPrecision(15))` snaps
   // 0.30000000000000004 back to 0.3 while leaving genuine values untouched.
   const cleaned = Number(raw.toPrecision(15));
   const sign = cleaned < 0 ? -1 : 1;
   const amount = Math.round(Math.abs(cleaned)) * sign;
-  return { amount, currency: currencyCode(currency) };
+  return { amount, currency: code };
 }
 
 /** Convert {@link Money} back to its major-unit floating-point representation. */
@@ -218,38 +219,30 @@ export function absMoney(m: Money): Money {
   return m.amount < 0 ? negateMoney(m) : m;
 }
 
-// ── Scalar minor-unit helpers (currency-neutral, exponent-based) ────────────
+// ── Scalar minor-unit helpers (bare numbers, exponent read from the currency) ─
 //
-// The double-entry ledger family (@classytic/ledger and hosts) works on BARE
-// integer minor-unit numbers with an explicit decimal exponent — not on the
-// structured {@link Money} value. These four helpers are the single authority
-// for that scalar dialect (PACKAGE_RULES §8.2 — one rounding point, one
-// owner). Their rounding is deliberately DIFFERENT from {@link fromMajor}:
-//
-//   - `fromMajor` (Money-struct authority): strips IEEE noise via
-//     `toPrecision(15)` and rounds half-AWAY-FROM-ZERO.
-//   - `majorToMinorUnits` (scalar ledger authority): raw IEEE
-//     `Math.round(major * 10^d)` — half-up toward +∞, no noise cleaning.
-//     `majorToMinorUnits(1.005) === 100` (1.005×100 is 100.4999… in IEEE 754)
-//     where `fromMajor(1.005,'USD').amount === 101`.
-//
-// The scalar family freezes the ledger's long-standing characterization-tested
-// wire behavior; changing its rounding would silently shift posted amounts.
-// New Money-struct code should prefer `fromMajor`/`toMajor`.
+// The ledger family works on BARE integer minor-unit numbers, not on the
+// structured {@link Money} value. These helpers take the CURRENCY and read its
+// exponent through `currencyExponent`, which throws for an unknown code — there
+// is no default exponent. Their rounding deliberately differs from {@link fromMajor}:
+// raw IEEE `Math.round(major * 10^d)` (half-up toward +∞, no `toPrecision`
+// cleaning), so `majorToMinorUnits(1.005, 'USD') === 100` where
+// `fromMajor(1.005, 'USD').amount === 101`. That freezes the ledger's
+// characterization-tested posting behavior. New Money-struct code should prefer
+// `fromMajor`/`toMajor`.
 
 /**
- * Decimal major-unit number → integer minor units by decimal exponent.
- * Rounding: raw IEEE `Math.round` — half-up toward +∞ (so `-10.5 → -10`),
- * documented above. Throws when the result leaves the safe-integer range
- * (also catches `NaN`/`Infinity` inputs).
+ * Decimal major-unit number → integer minor units at the currency's exponent.
+ * Throws `UnknownCurrencyError` for an unknown currency and `RangeError` when the
+ * result leaves the safe-integer range (also catches `NaN`/`Infinity` inputs).
  *
  * @example
- * majorToMinorUnits(10.5)      // 1050
- * majorToMinorUnits(1000, 0)   // 1000 (JPY-style)
- * majorToMinorUnits(1.005)     // 100 — IEEE, see note above
+ * majorToMinorUnits(10.5, 'USD')   // 1050
+ * majorToMinorUnits(1000, 'JPY')   // 1000
+ * majorToMinorUnits(1.234, 'KWD')  // 1234
  */
-export function majorToMinorUnits(major: number, minorUnitDecimals = 2): number {
-  const factor = 10 ** minorUnitDecimals;
+export function majorToMinorUnits(major: number, currency: string): number {
+  const factor = 10 ** currencyExponent(currency);
   const minor = Math.round(major * factor);
   if (!Number.isSafeInteger(minor)) {
     throw new RangeError(
@@ -260,9 +253,9 @@ export function majorToMinorUnits(major: number, minorUnitDecimals = 2): number 
   return minor;
 }
 
-/** Integer minor units → decimal major-unit number by decimal exponent: `1050 → 10.5`. */
-export function minorUnitsToMajor(minor: number, minorUnitDecimals = 2): number {
-  return minor / 10 ** minorUnitDecimals;
+/** Integer minor units → major-unit number at the currency's exponent: `(1050, 'USD') → 10.5`, `(1000, 'JPY') → 1000`. */
+export function minorUnitsToMajor(minor: number, currency: string): number {
+  return minor / 10 ** currencyExponent(currency);
 }
 
 /**
@@ -285,12 +278,13 @@ export function percentOfMinor(minor: number, ratePercent: number): number {
 }
 
 /**
- * Integer minor units → plain decimal string (no currency symbol, no locale):
- * `formatMinorUnits(10550) → "105.50"`, `formatMinorUnits(1000, 0) → "1000"`.
+ * Integer minor units → plain decimal string at the currency's exponent (no symbol, no locale):
+ * `(10550, 'USD') → "105.50"`, `(1000, 'JPY') → "1000"`, `(1234, 'KWD') → "1.234"`.
  * For localized currency strings use `Intl.NumberFormat` at the display layer.
  */
-export function formatMinorUnits(minor: number, minorUnitDecimals = 2): string {
-  return minorUnitsToMajor(minor, minorUnitDecimals).toFixed(minorUnitDecimals);
+export function formatMinorUnits(minor: number, currency: string): string {
+  const decimals = currencyExponent(currency);
+  return (minor / 10 ** decimals).toFixed(decimals);
 }
 
 /** Structural type guard. */

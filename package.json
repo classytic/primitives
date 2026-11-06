@@ -1,6 +1,6 @@
 {
   "name": "@classytic/primitives",
-  "version": "0.36.0",
+  "version": "0.37.0",
   "description": "Framework-agnostic TypeScript primitives shared across Classytic packages — Money, events, pagination, tenant config, and other building blocks.",
   "author": "Classytic",
   "license": "MIT",
@@ -155,6 +155,11 @@
       "@classytic/source": "./src/scheduling/shelf-life.ts",
       "types": "./dist/shelf-life.d.mts",
       "default": "./dist/shelf-life.mjs"
+    },
+    "./period-snapshot": {
+      "@classytic/source": "./src/scheduling/period-snapshot.ts",
+      "types": "./dist/period-snapshot.d.mts",
+      "default": "./dist/period-snapshot.mjs"
     },
     "./person": {
       "@classytic/source": "./src/identity/person.ts",
